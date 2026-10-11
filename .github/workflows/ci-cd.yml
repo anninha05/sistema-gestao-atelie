@@ -12,6 +12,22 @@ jobs:
   build-and-test:
     name: 🛠️ Build & Testes (Java 21)
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: ${{ secrets.DB_USER }}   # Confirme se é o mesmo do application.properties
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }} # Confirme se é o mesmo do application.properties
+          POSTGRES_DB: atelie_db
+        ports:
+          - 5432:5432
+        # Isso garante que o Java só roda depois que o banco estiver 100% pronto
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     
     defaults:
       run:
@@ -19,14 +35,15 @@ jobs:
 
     steps:
       - name: 📥 Fazer o checkout do código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: ☕ Configurar o Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
+          cache-dependency-path: backend/pom.xml
 
       - name: 🛡️ Dar permissão de execução ao Maven
         run: chmod +x mvnw
