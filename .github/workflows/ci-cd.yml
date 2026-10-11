@@ -17,12 +17,11 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: ${{ secrets.DB_USER }}   # Confirme se é o mesmo do application.properties
-          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }} # Confirme se é o mesmo do application.properties
+          POSTGRES_USER: ${{ secrets.DB_USER }}   
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
           POSTGRES_DB: atelie_db
         ports:
           - 5432:5432
-        # Isso garante que o Java só roda depois que o banco estiver 100% pronto
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
