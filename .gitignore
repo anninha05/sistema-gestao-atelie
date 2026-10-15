@@ -1,23 +1,70 @@
-# IDEs e SO
-.idea/
+# =========================
+# SEGURANÇA E AMBIENTE
+# =========================
+.env
+*.local
+
+# =========================
+# BACKEND (Java / Spring / Maven)
+# =========================
+target/
+!**/src/main/**/target/
+!**/src/test/**/target/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+.mvn/wrapper/maven-wrapper.jar
+*.log
+HELP.md
+
+# =========================
+# FRONTEND (Node.js)
+# =========================
+node_modules/
+dist/
+dist-ssr/
+
+# =========================
+# POSTMAN
+# =========================
+.postman/
+
+# =========================
+# SISTEMA OPERACIONAL
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# IDEs E EDITORES DE CÓDIGO
+# =========================
+# VS Code
 .vscode/
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Eclipse / Spring Tool Suite
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/nbdist/
+/.nb-gradle/
+
+# Visual Studio / Vim
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-.DS_Store
-Thumbs.db
-
-# Node (Front-end)
-node_modules/
-dist/
-dist-ssr/
-*.local
-
-# Maven/Java (Back-end)
-target/
-*.log
-
-# Variaveis de Ambiente
-.env
