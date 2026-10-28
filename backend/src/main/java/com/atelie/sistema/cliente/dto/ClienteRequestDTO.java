@@ -1,4 +1,4 @@
-package com.atelie.sistema.dto;
+package com.atelie.sistema.cliente.dto;
 
 public record ClienteRequestDTO(
                 String nome,

@@ -1,4 +1,4 @@
-package com.atelie.sistema.dto;
+package com.atelie.sistema.cliente.dto;
 
 import java.time.LocalDateTime;
 import java.util.UUID;

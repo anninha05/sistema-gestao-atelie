@@ -1,4 +1,4 @@
-package com.atelie.sistema.domain.model;
+package com.atelie.sistema.cliente;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;

@@ -1,24 +1,22 @@
-package com.atelie.sistema.service;
+package com.atelie.sistema.cliente;
 
-import com.atelie.sistema.domain.model.Cliente;
-import com.atelie.sistema.domain.repository.ClienteRepositoryGateway;
-import com.atelie.sistema.dto.ClienteRequestDTO;
-import com.atelie.sistema.dto.ClienteResponseDTO;
+import com.atelie.sistema.cliente.dto.ClienteRequestDTO;
+import com.atelie.sistema.cliente.dto.ClienteResponseDTO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ClienteService {
 
-    private final ClienteRepositoryGateway clienteGateway;
+    private final ClienteRepository clienteRepository;
 
-    public ClienteService(ClienteRepositoryGateway clienteGateway) {
-        this.clienteGateway = clienteGateway;
+    public ClienteService(ClienteRepository clienteRepository) {
+        this.clienteRepository = clienteRepository;
     }
 
     @Transactional
     public ClienteResponseDTO cadastrarCliente(ClienteRequestDTO dto) {
-        if (dto.cpf() != null && !dto.cpf().isBlank() && clienteGateway.existePorCpf(dto.cpf())) {
+        if (dto.cpf() != null && !dto.cpf().isBlank() && clienteRepository.existsByCpf(dto.cpf())) {
             throw new IllegalArgumentException("Já existe um cliente cadastrado com este CPF.");
         }
 
@@ -28,7 +26,7 @@ public class ClienteService {
                 dto.email(),
                 dto.cpf());
 
-        Cliente clienteSalvo = clienteGateway.salvar(novoCliente);
+        Cliente clienteSalvo = clienteRepository.save(novoCliente);
 
         return new ClienteResponseDTO(
                 clienteSalvo.getId(),

@@ -1,5 +1,6 @@
 package com.atelie.sistema.domain.model;
 
+import com.atelie.sistema.cliente.Cliente;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

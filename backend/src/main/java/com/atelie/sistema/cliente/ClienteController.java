@@ -1,8 +1,7 @@
-package com.atelie.sistema.controller;
+package com.atelie.sistema.cliente;
 
-import com.atelie.sistema.dto.ClienteRequestDTO;
-import com.atelie.sistema.dto.ClienteResponseDTO;
-import com.atelie.sistema.service.ClienteService;
+import com.atelie.sistema.cliente.dto.ClienteRequestDTO;
+import com.atelie.sistema.cliente.dto.ClienteResponseDTO;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
