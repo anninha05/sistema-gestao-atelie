@@ -1,4 +1,4 @@
-package com.atelie.sistema.domain.model;
+package com.atelie.sistema.usuario;
 
 public enum Perfil {
     ROLE_ADMIN,

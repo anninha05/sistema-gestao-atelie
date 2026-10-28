@@ -1,6 +1,5 @@
-package com.atelie.sistema.domain.repository;
+package com.atelie.sistema.usuario;
 
-import com.atelie.sistema.domain.model.Usuario;
 import java.util.Optional;
 
 public interface UsuarioRepositoryGateway {
