@@ -1,9 +1,7 @@
-package com.atelie.sistema.service;
+package com.atelie.sistema.peca;
 
-import com.atelie.sistema.domain.model.Peca;
-import com.atelie.sistema.domain.repository.PecaRepositoryGateway;
-import com.atelie.sistema.dto.PecaRequestDTO;
-import com.atelie.sistema.dto.PecaResponseDTO;
+import com.atelie.sistema.peca.dto.PecaRequestDTO;
+import com.atelie.sistema.peca.dto.PecaResponseDTO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,10 +10,10 @@ import java.util.List;
 @Service
 public class PecaService {
 
-    private final PecaRepositoryGateway pecaGateway;
+    private final PecaRepository pecaRepository;
 
-    public PecaService(PecaRepositoryGateway pecaGateway) {
-        this.pecaGateway = pecaGateway;
+    public PecaService(PecaRepository pecaRepository) {
+        this.pecaRepository = pecaRepository;
     }
 
     @Transactional
@@ -30,14 +28,14 @@ public class PecaService {
         if (dto.cor() != null) {
             novaPeca.setCor(dto.cor());
         }
-        Peca pecaSalva = pecaGateway.salvar(novaPeca);
+        Peca pecaSalva = pecaRepository.save(novaPeca);
 
         return new PecaResponseDTO(pecaSalva.getId(), pecaSalva.getDescricao(), pecaSalva.getTipo(),
                 pecaSalva.getStatusDisponibilidade());
     }
 
     public List<PecaResponseDTO> listarDisponiveis() {
-        return pecaGateway.buscarDisponiveis().stream()
+        return pecaRepository.findByStatusDisponibilidade(StatusDisponibilidade.DISPONIVEL).stream()
                 .map(p -> new PecaResponseDTO(p.getId(), p.getDescricao(), p.getTipo(), p.getStatusDisponibilidade()))
                 .toList();
     }

@@ -1,8 +1,7 @@
-package com.atelie.sistema.controller;
+package com.atelie.sistema.peca;
 
-import com.atelie.sistema.dto.PecaRequestDTO;
-import com.atelie.sistema.dto.PecaResponseDTO;
-import com.atelie.sistema.service.PecaService;
+import com.atelie.sistema.peca.dto.PecaRequestDTO;
+import com.atelie.sistema.peca.dto.PecaResponseDTO;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

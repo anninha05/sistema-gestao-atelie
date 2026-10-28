@@ -1,4 +1,4 @@
-package com.atelie.sistema.domain.model;
+package com.atelie.sistema.peca;
 
 import jakarta.persistence.*;
 import java.util.UUID;
