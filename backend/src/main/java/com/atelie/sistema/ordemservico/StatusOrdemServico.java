@@ -1,4 +1,4 @@
-package com.atelie.sistema.domain.model;
+package com.atelie.sistema.ordemservico;
 
 public enum StatusOrdemServico {
     PENDENTE, // O.S. criada, mas o trabalho ainda não começou

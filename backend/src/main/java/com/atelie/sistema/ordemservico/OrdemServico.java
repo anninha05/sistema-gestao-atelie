@@ -1,4 +1,4 @@
-package com.atelie.sistema.domain.model;
+package com.atelie.sistema.ordemservico;
 
 import com.atelie.sistema.cliente.Cliente;
 import com.atelie.sistema.peca.TipoFluxo;

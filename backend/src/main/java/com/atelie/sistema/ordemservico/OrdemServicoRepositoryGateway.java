@@ -1,6 +1,5 @@
-package com.atelie.sistema.domain.repository;
+package com.atelie.sistema.ordemservico;
 
-import com.atelie.sistema.domain.model.OrdemServico;
 import java.util.Optional;
 import java.util.List;
 
