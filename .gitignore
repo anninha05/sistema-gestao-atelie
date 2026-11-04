@@ -1,12 +1,5 @@
-# =========================
-# SEGURANÇA E AMBIENTE
-# =========================
 .env
 *.local
-
-# =========================
-# BACKEND (Java / Spring / Maven)
-# =========================
 target/
 !**/src/main/**/target/
 !**/src/test/**/target/
@@ -16,38 +9,17 @@ build/
 .mvn/wrapper/maven-wrapper.jar
 *.log
 HELP.md
-
-# =========================
-# FRONTEND (Node.js)
-# =========================
 node_modules/
 dist/
 dist-ssr/
-
-# =========================
-# POSTMAN
-# =========================
 .postman/
-
-# =========================
-# SISTEMA OPERACIONAL
-# =========================
 .DS_Store
 Thumbs.db
-
-# =========================
-# IDEs E EDITORES DE CÓDIGO
-# =========================
-# VS Code
 .vscode/
-
-# IntelliJ IDEA
 .idea/
 *.iws
 *.iml
 *.ipr
-
-# Eclipse / Spring Tool Suite
 .apt_generated
 .classpath
 .factorypath
@@ -55,16 +27,14 @@ Thumbs.db
 .settings
 .springBeans
 .sts4-cache
-
-# NetBeans
 /nbproject/private/
 /nbbuild/
 /nbdist/
 /.nb-gradle/
-
-# Visual Studio / Vim
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+/frontend/
+/docs/
