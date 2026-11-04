@@ -1,10 +1,13 @@
 package com.atelie.sistema.ordemservico;
 
 import com.atelie.sistema.cliente.Cliente;
+import com.atelie.sistema.ordemservico.state.*;
 import com.atelie.sistema.peca.TipoFluxo;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -19,6 +22,9 @@ public class OrdemServico {
     @JoinColumn(name = "cliente_id", nullable = false)
     private Cliente cliente;
 
+    @Version
+    private long versao;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "tipo_fluxo", nullable = false, length = 50)
     private TipoFluxo tipoFluxo;
@@ -27,8 +33,26 @@ public class OrdemServico {
     @Column(name = "status_atual", nullable = false, length = 50)
     private StatusOrdemServico statusAtual;
 
+    @Transient
+    private EstadoOS estado;
+
     @Column(name = "valor_total")
     private BigDecimal valorTotal;
+
+    @OneToOne(mappedBy = "ordemServico", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Pagamento pagamento;
+
+    @ElementCollection
+    @CollectionTable(name = "ordens_servico_pecas", joinColumns = @JoinColumn(name = "ordem_servico_id"))
+    private List<ItemOrdemServico> itens = new java.util.ArrayList<>();
+
+    private BigDecimal desconto = BigDecimal.ZERO;
+    private LocalDateTime inicioLocacao;
+    private LocalDateTime fimLocacao;
+    private LocalDateTime dataProva;
+    private LocalDateTime dataEvento;
+    private String instrucoesCostura;
+    private String medidas;
 
     @Column(name = "data_entrega")
     private LocalDateTime dataEntrega;
@@ -47,37 +71,157 @@ public class OrdemServico {
         this.tipoFluxo = tipoFluxo;
         this.valorTotal = valorTotal;
         this.dataEntrega = dataEntrega;
-        this.statusAtual = StatusOrdemServico.PENDENTE;
+        this.setEstado(new Reservada());
+        if (valorTotal != null) {
+            this.pagamento = new Pagamento(this, valorTotal);
+        }
     }
 
-    // MÁQUINA DE ESTADOS
+    public OrdemServico(Cliente cliente, TipoFluxo tipoFluxo, BigDecimal valorTotal, LocalDateTime dataEntrega,
+            List<ItemOrdemServico> itens, BigDecimal desconto, LocalDateTime inicioLocacao,
+            LocalDateTime fimLocacao, LocalDateTime dataProva, LocalDateTime dataEvento,
+            String instrucoesCostura, String medidas) {
+        this(cliente, tipoFluxo, valorTotal, dataEntrega);
+        this.itens.addAll(itens);
+        this.desconto = desconto;
+        this.inicioLocacao = inicioLocacao;
+        this.fimLocacao = fimLocacao;
+        this.dataProva = dataProva;
+        this.dataEvento = dataEvento;
+        this.instrucoesCostura = instrucoesCostura;
+        this.medidas = medidas;
+    }
+
+    public List<ItemOrdemServico> getItens() {
+        return List.copyOf(itens);
+    }
+
+    public BigDecimal getDesconto() {
+        return desconto;
+    }
+
+    public LocalDateTime getInicioLocacao() {
+        return inicioLocacao;
+    }
+
+    public LocalDateTime getFimLocacao() {
+        return fimLocacao;
+    }
+
+    public LocalDateTime getDataProva() {
+        return dataProva;
+    }
+
+    public LocalDateTime getDataEvento() {
+        return dataEvento;
+    }
+
+    public String getInstrucoesCostura() {
+        return instrucoesCostura;
+    }
+
+    public String getMedidas() {
+        return medidas;
+    }
+
+    public LocalDateTime getCriadoEm() {
+        return criadoEm;
+    }
+
+    // STATE PATTERN
+
+    public EstadoOS getEstado() {
+        if (this.estado == null) {
+            this.estado = mapearEstado(this.statusAtual);
+        }
+        return this.estado;
+    }
+
+    public void setEstado(EstadoOS estado) {
+        this.estado = estado;
+        this.statusAtual = estado.getStatus();
+    }
+
+    private EstadoOS mapearEstado(StatusOrdemServico status) {
+        if (status == null) {
+            return new Reservada();
+        }
+        return switch (status) {
+            case EM_PROVA, PROVA -> new EmProva();
+            case RETIRADA -> new Retirada();
+            case CONFECCAO, AJUSTES, PASSADORIA, CONCLUIDO, ENTREGUE, CANCELADA -> new EtapaProducao(status);
+            case DEVOLVIDA -> new Devolvida();
+            default -> new Reservada();
+        };
+    }
+
+    @PostLoad
+    protected void onPostLoad() {
+        this.estado = mapearEstado(this.statusAtual);
+    }
 
     public void iniciarConfeccao() {
-        if (this.statusAtual != StatusOrdemServico.PENDENTE && this.statusAtual != StatusOrdemServico.AJUSTES) {
-            throw new IllegalStateException("Só é possível iniciar confecção se estiver PENDENTE ou em AJUSTES.");
+        getEstado().iniciarConfeccao(this);
+    }
+
+    public void iniciarPassadoria() {
+        if (statusAtual != StatusOrdemServico.AJUSTES && statusAtual != StatusOrdemServico.EM_PROVA) {
+            throw new com.atelie.sistema.shared.exception.RegraNegocioException(
+                    "A ordem precisa passar pelos ajustes.");
         }
-        this.statusAtual = StatusOrdemServico.CONFECCAO;
+        setEstado(new EtapaProducao(StatusOrdemServico.PASSADORIA));
+    }
+
+    public void cancelar() {
+        switch (statusAtual) {
+            case RETIRADA, ENTREGUE, DEVOLVIDA, CANCELADA ->
+                throw new com.atelie.sistema.shared.exception.RegraNegocioException(
+                        "A ordem não pode mais ser cancelada.");
+            default -> setEstado(new EtapaProducao(StatusOrdemServico.CANCELADA));
+        }
     }
 
     public void enviarParaProva() {
-        if (this.statusAtual != StatusOrdemServico.CONFECCAO) {
-            throw new IllegalStateException("A roupa precisa estar em CONFECÇÃO para ir para PROVA.");
-        }
-        this.statusAtual = StatusOrdemServico.PROVA;
+        getEstado().enviarParaProva(this);
     }
 
     public void concluir() {
-        if (this.statusAtual != StatusOrdemServico.PROVA && this.statusAtual != StatusOrdemServico.CONFECCAO) {
-            throw new IllegalStateException("A roupa precisa ser confeccionada ou provada antes de ser CONCLUÍDA.");
-        }
-        this.statusAtual = StatusOrdemServico.CONCLUIDO;
+        getEstado().concluir(this);
     }
 
     public void entregarAoCliente() {
-        if (this.statusAtual != StatusOrdemServico.CONCLUIDO) {
-            throw new IllegalStateException("Não é possível entregar uma roupa que não está CONCLUÍDA.");
+        getEstado().retirar(this);
+    }
+
+    public void retirar() {
+        getEstado().retirar(this);
+    }
+
+    public void devolver() {
+        getEstado().devolver(this);
+    }
+
+    // PAGAMENTO (COMPOSIÇÃO)
+
+    public void registrarSinal(BigDecimal valor, LocalDate data) {
+        garantirPagamento().registrarSinal(valor, data);
+    }
+
+    public void registrarPagamento(BigDecimal valor) {
+        garantirPagamento().registrarPagamento(valor);
+    }
+
+    public void alterarValorTotal(BigDecimal novoValor) {
+        Pagamento pag = garantirPagamento();
+        pag.alterarValorTotal(novoValor);
+        this.valorTotal = pag.getValorTotal();
+    }
+
+    private Pagamento garantirPagamento() {
+        if (this.pagamento == null) {
+            this.pagamento = new Pagamento(this, this.valorTotal);
         }
-        this.statusAtual = StatusOrdemServico.ENTREGUE;
+        return this.pagamento;
     }
 
     // AUDITORIA
@@ -86,11 +230,17 @@ public class OrdemServico {
     protected void onCreate() {
         this.criadoEm = LocalDateTime.now();
         this.atualizadoEm = LocalDateTime.now();
+        if (this.statusAtual == null && this.estado != null) {
+            this.statusAtual = this.estado.getStatus();
+        }
     }
 
     @PreUpdate
     protected void onUpdate() {
         this.atualizadoEm = LocalDateTime.now();
+        if (this.estado != null) {
+            this.statusAtual = this.estado.getStatus();
+        }
     }
 
     public UUID getId() {
@@ -111,6 +261,10 @@ public class OrdemServico {
 
     public BigDecimal getValorTotal() {
         return valorTotal;
+    }
+
+    public Pagamento getPagamento() {
+        return garantirPagamento();
     }
 
     public LocalDateTime getDataEntrega() {
