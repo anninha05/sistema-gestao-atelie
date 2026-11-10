@@ -2,6 +2,7 @@ package com.atelie.sistema.usuario;
 
 import com.atelie.sistema.shared.exception.RegraNegocioException;
 import com.atelie.sistema.shared.exception.RecursoNaoEncontradoException;
+import com.atelie.sistema.shared.validacao.Email;
 import com.atelie.sistema.usuario.dto.UsuarioRequestDTO;
 import com.atelie.sistema.usuario.dto.UsuarioResponseDTO;
 import org.springframework.stereotype.Service;
@@ -26,12 +27,14 @@ public class UsuarioService {
     @Transactional
     public UsuarioResponseDTO cadastrarUsuario(UsuarioRequestDTO dto) {
         if (dto.nome() == null || dto.nome().isBlank() || dto.nome().length() > 255
-                || dto.email() == null || !dto.email().strip().matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")
-                || dto.email().length() > 255 || dto.perfil() == null || dto.senha() == null
+                || dto.perfil() == null || dto.senha() == null
                 || dto.senha().length() < 8 || dto.senha().getBytes(StandardCharsets.UTF_8).length > 72) {
-            throw new RegraNegocioException("Informe nome, e-mail, perfil e uma senha válida com ao menos oito caracteres.");
+            throw new RegraNegocioException("Informe nome, perfil e uma senha válida com ao menos oito caracteres.");
         }
-        String email = dto.email().strip().toLowerCase(Locale.ROOT);
+        String email = dto.email() == null ? null : dto.email().strip().toLowerCase(Locale.ROOT);
+        if (!Email.valido(email)) {
+            throw new RegraNegocioException("Informe um e-mail válido.");
+        }
         if (usuarioRepository.existsByEmail(email)) {
             throw new RegraNegocioException("Já existe um usuário cadastrado com este e-mail.");
         }
