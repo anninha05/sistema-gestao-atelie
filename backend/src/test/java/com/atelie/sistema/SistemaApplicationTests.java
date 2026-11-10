@@ -32,7 +32,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties = "spring.datasource.url=${ATELIE_TEST_JDBC_URL}")
+@SpringBootTest(properties = {
+        "spring.config.import=optional:file:.env[.properties],optional:file:../.env[.properties]",
+        "spring.datasource.url=${ATELIE_TEST_JDBC_URL:jdbc:postgresql://localhost:5432/atelie_test}",
+        "ADMIN_EMAIL=",
+        "ADMIN_PASSWORD="
+})
 @AutoConfigureMockMvc
 class SistemaApplicationTests {
 
@@ -78,13 +83,13 @@ class SistemaApplicationTests {
 
     @Test
     void devePersistirReservaFluxoERecebimento() {
-        var cpf = Long.toString(ThreadLocalRandom.current().nextLong(10000000000L, 100000000000L));
+        var cpf = gerarCpfParaTeste();
         var cliente = clientes.cadastrarCliente(new ClienteRequestDTO("Cliente teste", "22999999999", "teste@email.com", cpf));
         var peca = pecas.cadastrarPeca(new PecaRequestDTO("Vestido", TipoFluxo.LOCACAO, new BigDecimal("150.00"), "M", "Azul"));
         var inicio = LocalDateTime.of(2030, 10, 10, 10, 0);
         var fim = inicio.plusDays(2);
         var pedido = new OrdemServicoRequestDTO(cliente.id(), TipoFluxo.LOCACAO, List.of(peca.id()),
-                new BigDecimal("10.00"), inicio, fim, null, null, null, null, inicio);
+                new BigDecimal("10.00"), inicio, fim, null, null, null, null, inicio, null);
 
         var ordem = ordens.abrirOrdemServico(pedido);
         assertEquals(new BigDecimal("140.00"), ordem.valorTotal());
@@ -108,5 +113,24 @@ class SistemaApplicationTests {
         ordens.retirar(ordem.id());
         ordens.devolver(ordem.id());
         assertTrue(ordens.disponivelNoPeriodo(peca.id(), inicio, fim));
+
+        var pedidoPercentual = new OrdemServicoRequestDTO(cliente.id(), TipoFluxo.LOCACAO, List.of(peca.id()),
+                null, inicio, fim, null, null, null, null, inicio, new BigDecimal("6.67"));
+        var ordemComPercentual = ordens.abrirOrdemServico(pedidoPercentual);
+        assertEquals(new BigDecimal("10.01"), ordemComPercentual.desconto());
+        assertEquals(new BigDecimal("139.99"), ordemComPercentual.valorTotal());
+    }
+
+    private static String gerarCpfParaTeste() {
+        var cpf = new StringBuilder(Long.toString(ThreadLocalRandom.current().nextLong(100000000L, 200000000L)));
+        while (cpf.length() < 11) {
+            int soma = 0;
+            for (int i = 0; i < cpf.length(); i++) {
+                soma += (cpf.charAt(i) - '0') * (cpf.length() + 1 - i);
+            }
+            int resto = soma % 11;
+            cpf.append(resto < 2 ? 0 : 11 - resto);
+        }
+        return cpf.toString();
     }
 }

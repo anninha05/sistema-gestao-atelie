@@ -65,6 +65,17 @@ public class OrdemServicoService {
         BigDecimal subtotal = itens.stream().map(ItemOrdemServico::valorUnitario)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal desconto = dto.desconto() == null ? BigDecimal.ZERO : dto.desconto();
+        if (dto.descontoPercentual() != null) {
+            BigDecimal percentual = dto.descontoPercentual();
+            if (dto.desconto() != null) {
+                throw new RegraNegocioException("Informe apenas um desconto: em reais ou em porcentagem.");
+            }
+            if (percentual.signum() < 0 || percentual.compareTo(new BigDecimal("100")) >= 0
+                    || percentual.stripTrailingZeros().scale() > 2) {
+                throw new RegraNegocioException("Informe um desconto de 0% a 99,99%, com até duas casas decimais.");
+            }
+            desconto = subtotal.multiply(percentual).movePointLeft(2).setScale(2, RoundingMode.HALF_UP);
+        }
         if (desconto.signum() < 0 || desconto.stripTrailingZeros().scale() > 2
                 || desconto.compareTo(subtotal) > 0) {
             throw new RegraNegocioException("Desconto inválido para o subtotal da ordem.");

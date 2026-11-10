@@ -17,5 +17,6 @@ public record OrdemServicoRequestDTO(
         LocalDateTime dataEvento,
         String instrucoesCostura,
         String medidas,
-        LocalDateTime dataEntrega) {
+        LocalDateTime dataEntrega,
+        BigDecimal descontoPercentual) {
 }
