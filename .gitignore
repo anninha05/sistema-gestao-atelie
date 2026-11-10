@@ -36,5 +36,4 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
-/frontend/
 /docs/
