@@ -15,9 +15,6 @@ export default function AcoesDaPeca({ peca, aoAtualizar }) {
     if (['DISPONIVEL', 'EM_LAVAGEM'].includes(peca.status)) acoes.push(['costura', 'Enviar para costura/manutenção']);
     if (['DISPONIVEL', 'EM_COSTURA', 'MANUTENCAO'].includes(peca.status)) acoes.push(['lavagem', 'Enviar para lavagem']);
   }
-  if (usuario.perfil !== 'ROLE_PRODUCAO') {
-    if (peca.status === 'DISPONIVEL') acoes.push(['alugar', 'Marcar como alugada']);
-  }
   if (['ROLE_ADMIN', 'ROLE_ATENDENTE', 'ROLE_PRODUCAO'].includes(usuario.perfil)
       && ['EM_COSTURA', 'EM_LAVAGEM', 'MANUTENCAO'].includes(peca.status)) {
     acoes.push(['devolver', 'Conferir e liberar peça']);

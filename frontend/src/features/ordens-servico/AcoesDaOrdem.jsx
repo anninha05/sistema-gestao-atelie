@@ -73,6 +73,9 @@ export default function AcoesDaOrdem({ ordem, aoAtualizar }) {
             </p>
           )}
           {acaoEscolhida[0] === 'cancelar' && <p>O cancelamento encerra o fluxo desta ordem.</p>}
+          {acaoEscolhida[0] === 'cancelar' && ordem.pendenciaAcerto && (
+            <p>Há valores recebidos nesta ordem. O cancelamento manterá o histórico e registrará uma pendência de acerto, sem estorno automático.</p>
+          )}
           {acaoEscolhida[0] === 'devolver' && (
             <p>Todas as peças desta locação serão encaminhadas à lavagem. Elas continuarão indisponíveis
               até a conclusão da lavagem e a liberação após conferência no inventário.</p>
