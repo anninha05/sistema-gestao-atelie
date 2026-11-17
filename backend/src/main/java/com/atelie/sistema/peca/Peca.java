@@ -94,6 +94,14 @@ public class Peca {
         getEstado().alugar(this);
     }
 
+    public void retirarParaLocacao() {
+        if (tipo != TipoFluxo.LOCACAO || statusDisponibilidade != StatusDisponibilidade.DISPONIVEL) {
+            throw new com.atelie.sistema.shared.exception.RegraNegocioException(
+                    "A peça " + codigoEtiqueta + " não está pronta para retirada. Verifique sua condição no inventário.");
+        }
+        marcarComoAlugada();
+    }
+
     public void enviarParaCostura() {
         getEstado().enviarParaCostura(this);
     }

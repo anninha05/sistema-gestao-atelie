@@ -190,10 +190,14 @@ public class OrdemServico {
     }
 
     public void entregarAoCliente() {
-        getEstado().retirar(this);
+        retirar();
     }
 
     public void retirar() {
+        if (getPagamento().getSaldoDevedor().compareTo(BigDecimal.ZERO) != 0) {
+            throw new com.atelie.sistema.shared.exception.RegraNegocioException(
+                    "Quite o saldo devedor da ordem antes de registrar a retirada ou entrega.");
+        }
         getEstado().retirar(this);
     }
 

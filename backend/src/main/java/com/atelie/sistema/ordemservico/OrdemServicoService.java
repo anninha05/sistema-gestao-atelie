@@ -163,8 +163,24 @@ public class OrdemServicoService {
 
     @Transactional
     public OrdemServicoResponseDTO retirar(UUID id) {
-        OrdemServico os = buscarEntidadePorId(id);
+        OrdemServico os = ordemServicoRepository.buscarParaRetirada(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Ordem de serviço não encontrada com id: " + id));
         os.retirar();
+        if (os.getTipoFluxo() == TipoFluxo.LOCACAO) {
+            if (os.getItens().isEmpty() || os.getInicioLocacao() == null || os.getFimLocacao() == null
+                    || !os.getInicioLocacao().isBefore(os.getFimLocacao())) {
+                throw new RegraNegocioException("A ordem não possui uma reserva válida para retirada.");
+            }
+            // Mesma ordem de bloqueio usada na reserva, inclusive em ordens com várias peças.
+            for (UUID pecaId : os.getItens().stream().map(ItemOrdemServico::pecaId).sorted().toList()) {
+                Peca peca = pecaRepository.buscarParaReserva(pecaId)
+                        .orElseThrow(() -> new RecursoNaoEncontradoException("Peça não encontrada com id: " + pecaId));
+                if (ordemServicoRepository.contarReservas(pecaId, os.getInicioLocacao(), os.getFimLocacao()) != 1) {
+                    throw new RegraNegocioException("A reserva da peça está inconsistente. Confira as ordens antes da retirada.");
+                }
+                peca.retirarParaLocacao();
+            }
+        }
         return toResponseDTO(os);
     }
 

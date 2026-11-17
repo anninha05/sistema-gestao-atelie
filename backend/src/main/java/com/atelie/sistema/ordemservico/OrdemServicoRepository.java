@@ -7,6 +7,10 @@ import java.util.UUID;
 
 public interface OrdemServicoRepository extends JpaRepository<OrdemServico, UUID> {
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select os from OrdemServico os where os.id = :id")
+    java.util.Optional<OrdemServico> buscarParaRetirada(UUID id);
+
     @org.springframework.data.jpa.repository.Query("""
             select count(i) from OrdemServico os join os.itens i
             where i.pecaId = :peca and os.inicioLocacao < :fim and os.fimLocacao > :inicio

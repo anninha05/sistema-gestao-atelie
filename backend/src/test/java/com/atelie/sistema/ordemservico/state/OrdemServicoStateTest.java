@@ -41,6 +41,7 @@ class OrdemServicoStateTest {
     @Test
     @DisplayName("Não deve permitir retirar roupa diretamente do estado RESERVADA")
     void naoDeveRetirarDiretoDeReservada() {
+        os.registrarPagamento(new BigDecimal("350.00"));
         assertThrows(RegraNegocioException.class, () -> os.retirar());
     }
 
@@ -54,6 +55,7 @@ class OrdemServicoStateTest {
         os.iniciarPassadoria();
         os.concluir();
         assertEquals(StatusOrdemServico.CONCLUIDO, os.getStatusAtual());
+        os.registrarPagamento(new BigDecimal("350.00"));
         os.retirar();
         assertEquals(StatusOrdemServico.RETIRADA, os.getStatusAtual());
         assertInstanceOf(Retirada.class, os.getEstado());
@@ -68,5 +70,16 @@ class OrdemServicoStateTest {
     void naoDeveDevolverEmProva() {
         os.enviarParaProva();
         assertThrows(RegraNegocioException.class, () -> os.devolver());
+    }
+
+    @Test
+    void deveExigirQuitacaoMesmoNaEntregaAoCliente() {
+        os.enviarParaProva();
+        os.iniciarPassadoria();
+        os.concluir();
+        os.registrarSinal(new BigDecimal("100.00"), java.time.LocalDate.now());
+        assertThrows(RegraNegocioException.class, os::retirar);
+        assertThrows(RegraNegocioException.class, os::entregarAoCliente);
+        assertEquals(StatusOrdemServico.CONCLUIDO, os.getStatusAtual());
     }
 }
