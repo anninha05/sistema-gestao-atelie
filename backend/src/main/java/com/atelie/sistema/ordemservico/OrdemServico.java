@@ -63,6 +63,9 @@ public class OrdemServico {
     @Column(name = "atualizado_em")
     private LocalDateTime atualizadoEm;
 
+    @Column(name = "pendencia_acerto", nullable = false)
+    private boolean pendenciaAcerto;
+
     protected OrdemServico() {
     }
 
@@ -177,7 +180,10 @@ public class OrdemServico {
             case RETIRADA, ENTREGUE, DEVOLVIDA, CANCELADA ->
                 throw new com.atelie.sistema.shared.exception.RegraNegocioException(
                         "A ordem não pode mais ser cancelada.");
-            default -> setEstado(new EtapaProducao(StatusOrdemServico.CANCELADA));
+            default -> {
+                pendenciaAcerto = getPagamento().getValorPago().signum() > 0;
+                setEstado(new EtapaProducao(StatusOrdemServico.CANCELADA));
+            }
         }
     }
 
@@ -278,4 +284,6 @@ public class OrdemServico {
     public LocalDateTime getDataEntrega() {
         return dataEntrega;
     }
+
+    public boolean isPendenciaAcerto() { return pendenciaAcerto; }
 }

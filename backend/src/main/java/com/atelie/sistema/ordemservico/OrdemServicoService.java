@@ -57,8 +57,8 @@ public class OrdemServicoService {
             if (peca.getTipo() != dto.tipoFluxo()) {
                 throw new RegraNegocioException("A peça precisa pertencer ao mesmo tipo da ordem.");
             }
-            if (locacao && ordemServicoRepository.contarReservas(id, dto.inicioLocacao(), dto.fimLocacao()) > 0) {
-                throw new RegraNegocioException("Peça já reservada no período: " + id);
+            if (locacao) {
+                validarDisponibilidade(peca, dto.inicioLocacao(), dto.fimLocacao());
             }
             return new ItemOrdemServico(id, peca.getValorBase());
         }).toList();
@@ -99,7 +99,22 @@ public class OrdemServicoService {
         }
         Peca peca = pecaRepository.findById(pecaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Peça não encontrada com id: " + pecaId));
-        return peca.getTipo() == TipoFluxo.LOCACAO && ordemServicoRepository.contarReservas(pecaId, inicio, fim) == 0;
+        if (peca.getTipo() != TipoFluxo.LOCACAO
+                || ordemServicoRepository.contarReservas(pecaId, inicio, fim) > 0) return false;
+        // Condição física atual só impede uma retirada que começaria agora/passado;
+        // não bloqueia reservas futuras sem uma janela de manutenção definida.
+        return inicio.isAfter(java.time.LocalDateTime.now())
+                || peca.getStatusDisponibilidade() == com.atelie.sistema.peca.state.StatusDisponibilidade.DISPONIVEL;
+    }
+
+    private void validarDisponibilidade(Peca peca, java.time.LocalDateTime inicio, java.time.LocalDateTime fim) {
+        if (ordemServicoRepository.contarReservas(peca.getId(), inicio, fim) > 0) {
+            throw new RegraNegocioException("Peça já reservada no período: " + peca.getCodigoEtiqueta());
+        }
+        if (!inicio.isAfter(java.time.LocalDateTime.now())
+                && peca.getStatusDisponibilidade() != com.atelie.sistema.peca.state.StatusDisponibilidade.DISPONIVEL) {
+            throw new RegraNegocioException("A peça não está fisicamente disponível para uma locação com início imediato.");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -149,7 +164,8 @@ public class OrdemServicoService {
 
     @Transactional
     public OrdemServicoResponseDTO cancelar(UUID id) {
-        OrdemServico os = buscarEntidadePorId(id);
+        OrdemServico os = ordemServicoRepository.buscarParaAtualizacao(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Ordem de serviço não encontrada com id: " + id));
         os.cancelar();
         return toResponseDTO(os);
     }
@@ -203,6 +219,7 @@ public class OrdemServicoService {
     @Transactional
     public PagamentoResponse registrarSinal(UUID id, RegistrarPagamentoRequest request) {
         OrdemServico os = buscarEntidadePorId(id);
+        validarOrdemFinanceiraAtiva(os);
         os.getPagamento().registrarRecebimento(request.valor(), request.data(), request.metodo(), true);
         return toPagamentoResponse(os.getPagamento());
     }
@@ -210,6 +227,7 @@ public class OrdemServicoService {
     @Transactional
     public PagamentoResponse registrarPagamento(UUID id, RegistrarPagamentoRequest request) {
         OrdemServico os = buscarEntidadePorId(id);
+        validarOrdemFinanceiraAtiva(os);
         os.getPagamento().registrarRecebimento(request.valor(), request.data(), request.metodo(), false);
         return toPagamentoResponse(os.getPagamento());
     }
@@ -232,6 +250,12 @@ public class OrdemServicoService {
                         .toList());
     }
 
+    private void validarOrdemFinanceiraAtiva(OrdemServico os) {
+        if (os.getStatusAtual() == StatusOrdemServico.CANCELADA) {
+            throw new RegraNegocioException("Não é possível registrar pagamentos em uma ordem cancelada; consulte a pendência de acerto.");
+        }
+    }
+
     private OrdemServicoResponseDTO toResponseDTO(OrdemServico os) {
         return new OrdemServicoResponseDTO(
                 os.getId(),
@@ -242,6 +266,6 @@ public class OrdemServicoService {
                 os.getValorTotal(),
                 os.getDataEntrega(),
                 os.getCriadoEm(), os.getItens(), os.getDesconto(), os.getInicioLocacao(),
-                os.getFimLocacao(), os.getDataProva(), os.getDataEvento(), os.getInstrucoesCostura(), os.getMedidas());
+                os.getFimLocacao(), os.getDataProva(), os.getDataEvento(), os.getInstrucoesCostura(), os.getMedidas(), os.isPendenciaAcerto());
     }
 }

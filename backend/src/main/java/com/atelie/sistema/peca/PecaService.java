@@ -68,13 +68,6 @@ public class PecaService {
     }
 
     @Transactional
-    public PecaResponseDTO marcarComoAlugada(UUID id) {
-        Peca peca = buscarParaAtualizacao(id);
-        peca.marcarComoAlugada();
-        return toResponseDTO(pecaRepository.save(peca));
-    }
-
-    @Transactional
     public PecaResponseDTO enviarParaCostura(UUID id) {
         Peca peca = buscarParaAtualizacao(id);
         peca.enviarParaCostura();

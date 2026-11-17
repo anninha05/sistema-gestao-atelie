@@ -24,5 +24,6 @@ public record OrdemServicoResponseDTO(
         LocalDateTime dataProva,
         LocalDateTime dataEvento,
         String instrucoesCostura,
-        String medidas) {
+        String medidas,
+        boolean pendenciaAcerto) {
 }

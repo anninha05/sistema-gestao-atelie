@@ -264,6 +264,101 @@ class SistemaApplicationTests {
     }
 
     @Test
+    void devePermitirReservasSemSobreposicaoParaMesmaPeca() {
+        var cliente = clientes.cadastrarCliente(new ClienteRequestDTO("Datas distintas", "22999999999", "datas@email.com", gerarCpfParaTeste()));
+        var peca = pecas.cadastrarPeca(new PecaRequestDTO("Peça agenda", TipoFluxo.LOCACAO, new BigDecimal("120.00"), "M", "Azul"));
+        var inicio = LocalDateTime.now().plusDays(30);
+        var primeira = new OrdemServicoRequestDTO(cliente.id(), TipoFluxo.LOCACAO, List.of(peca.id()), null,
+                inicio, inicio.plusDays(2), null, null, null, null, inicio, null);
+        var segunda = new OrdemServicoRequestDTO(cliente.id(), TipoFluxo.LOCACAO, List.of(peca.id()), null,
+                inicio.plusDays(2), inicio.plusDays(4), null, null, null, null, inicio, null);
+        assertNotNull(ordens.abrirOrdemServico(primeira).id());
+        assertNotNull(ordens.abrirOrdemServico(segunda).id());
+        assertTrue(ordens.disponivelNoPeriodo(peca.id(), inicio.plusDays(4), inicio.plusDays(5)));
+    }
+
+    @Test
+    void devePermitirReservaFuturaComPecaEmLavagemMasImpedirInicioImediato() {
+        var cliente = clientes.cadastrarCliente(new ClienteRequestDTO("Peça em lavagem", "22999999999", "lavagem@email.com", gerarCpfParaTeste()));
+        var peca = pecas.cadastrarPeca(new PecaRequestDTO("Peça agenda", TipoFluxo.LOCACAO, new BigDecimal("120.00"), "M", "Azul"));
+        pecas.enviarParaLavagem(peca.id());
+        var agora = LocalDateTime.now();
+        var imediata = new OrdemServicoRequestDTO(cliente.id(), TipoFluxo.LOCACAO, List.of(peca.id()), null,
+                agora.minusMinutes(1), agora.plusDays(1), null, null, null, null, agora, null);
+        assertThrows(RegraNegocioException.class, () -> ordens.abrirOrdemServico(imediata));
+        assertFalse(ordens.disponivelNoPeriodo(peca.id(), agora, agora.plusDays(1)));
+        var futura = new OrdemServicoRequestDTO(cliente.id(), TipoFluxo.LOCACAO, List.of(peca.id()), null,
+                agora.plusDays(10), agora.plusDays(12), null, null, null, null, agora, null);
+        assertNotNull(ordens.abrirOrdemServico(futura).id());
+        assertEquals(StatusDisponibilidade.EM_LAVAGEM, pecas.buscarPorId(peca.id()).status());
+    }
+
+    @Test
+    void deveImpedirDuasReservasSimultaneasDaMesmaPeca() throws Exception {
+        var cliente = clientes.cadastrarCliente(new ClienteRequestDTO("Reserva concorrente", "22999999999", "concorrente@email.com", gerarCpfParaTeste()));
+        var peca = pecas.cadastrarPeca(new PecaRequestDTO("Peça concorrente", TipoFluxo.LOCACAO, new BigDecimal("120.00"), "M", "Azul"));
+        var inicio = LocalDateTime.now().plusDays(30);
+        var pedido = new OrdemServicoRequestDTO(cliente.id(), TipoFluxo.LOCACAO, List.of(peca.id()), null,
+                inicio, inicio.plusDays(2), null, null, null, null, inicio, null);
+        var prontas = new CountDownLatch(2);
+        var iniciar = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            java.util.concurrent.Callable<Boolean> reservar = () -> {
+                prontas.countDown();
+                if (!iniciar.await(10, TimeUnit.SECONDS)) throw new AssertionError("Reservas não iniciaram");
+                try { ordens.abrirOrdemServico(pedido); return true; }
+                catch (RegraNegocioException esperado) { return false; }
+            };
+            var primeira = executor.submit(reservar);
+            var segunda = executor.submit(reservar);
+            assertTrue(prontas.await(10, TimeUnit.SECONDS));
+            iniciar.countDown();
+            assertNotEquals(primeira.get(20, TimeUnit.SECONDS), segunda.get(20, TimeUnit.SECONDS));
+        }
+        assertEquals(1, jdbc.queryForObject("select count(*) from ordens_servico_pecas i join ordens_servico os on os.id = i.ordem_servico_id where i.peca_id = ? and os.status_atual not in ('DEVOLVIDA', 'CANCELADA')", Integer.class, peca.id()));
+    }
+
+    @Test
+    void deveBloquearRotasDeAluguelEDevolucaoDiretosEManterManutencaoAutorizada() throws Exception {
+        var peca = pecas.cadastrarPeca(new PecaRequestDTO("Ação direta", TipoFluxo.LOCACAO, new BigDecimal("120.00"), "M", "Azul"));
+        var atendimento = autenticar(Perfil.ROLE_ATENDENTE);
+        var producao = autenticar(Perfil.ROLE_PRODUCAO);
+        var tokenAtendimento = obterToken(atendimento);
+        var tokenProducao = obterToken(producao);
+        mvc.perform(patch("/pecas/" + peca.id() + "/alugar").session(atendimento).header("X-CSRF-TOKEN", tokenAtendimento))
+                .andExpect(status().isNotFound());
+        mvc.perform(patch("/pecas/" + peca.id() + "/devolver").session(atendimento).header("X-CSRF-TOKEN", tokenAtendimento)
+                .contentType("application/json").content("{\"lavagemConcluida\":true,\"condicoesConferidas\":true}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(patch("/pecas/" + peca.id() + "/costura").session(producao).header("X-CSRF-TOKEN", tokenProducao))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("EM_COSTURA"));
+        mvc.perform(patch("/pecas/" + peca.id() + "/costura").session(atendimento).header("X-CSRF-TOKEN", tokenAtendimento))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void deveCancelarComPendenciaPreservarRecebimentosELiberarReserva() {
+        var cliente = clientes.cadastrarCliente(new ClienteRequestDTO("Cancelar", "22999999999", "cancelar@email.com", gerarCpfParaTeste()));
+        var peca = pecas.cadastrarPeca(new PecaRequestDTO("Peça cancelar", TipoFluxo.LOCACAO, new BigDecimal("120.00"), "M", "Azul"));
+        var inicio = LocalDateTime.now().plusDays(30);
+        var pedido = new OrdemServicoRequestDTO(cliente.id(), TipoFluxo.LOCACAO, List.of(peca.id()), null,
+                inicio, inicio.plusDays(2), null, null, null, null, inicio, null);
+        var ordem = ordens.abrirOrdemServico(pedido);
+        ordens.registrarSinal(ordem.id(), new RegistrarPagamentoRequest(new BigDecimal("30.00"), LocalDate.now(), MetodoPagamento.PIX));
+        var cancelada = ordens.cancelar(ordem.id());
+        assertEquals(StatusOrdemServico.CANCELADA, cancelada.statusAtual());
+        assertTrue(cancelada.pendenciaAcerto());
+        assertTrue(ordens.disponivelNoPeriodo(peca.id(), inicio, inicio.plusDays(2)));
+        assertEquals(new BigDecimal("30.00"), ordens.buscarPagamento(ordem.id()).valorPago());
+        assertEquals(1, ordens.buscarPagamento(ordem.id()).recebimentos().size());
+        assertThrows(RegraNegocioException.class, () -> ordens.retirar(ordem.id()));
+        assertThrows(RegraNegocioException.class, () -> ordens.registrarPagamento(ordem.id(),
+                new RegistrarPagamentoRequest(BigDecimal.ONE, LocalDate.now(), MetodoPagamento.PIX)));
+        assertEquals(1, ordens.buscarPagamento(ordem.id()).recebimentos().size());
+        assertThrows(RegraNegocioException.class, () -> ordens.cancelar(ordem.id()));
+    }
+
+    @Test
     void deveRejeitarLocacaoSemItens() {
         var ordem = criarOrdemPronta(TipoFluxo.LOCACAO, 1);
         quitar(ordem);
