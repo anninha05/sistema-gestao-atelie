@@ -26,7 +26,7 @@ export default function AcoesDaOrdem({ ordem, aoAtualizar }) {
   if (atendimento && ordem.statusAtual === 'CONCLUIDO') {
     acoes.push(['retirar', ordem.tipoFluxo === 'LOCACAO' ? 'Registrar retirada' : 'Registrar entrega']);
   }
-  if (atendimento && ordem.statusAtual === 'RETIRADA') {
+  if (atendimento && ordem.tipoFluxo === 'LOCACAO' && ordem.statusAtual === 'RETIRADA') {
     acoes.push(['devolver', 'Registrar devolução']);
   }
   if (atendimento && ['PENDENTE', 'RESERVADA', 'CONFECCAO', 'PROVA', 'EM_PROVA', 'AJUSTES', 'PASSADORIA', 'CONCLUIDO'].includes(ordem.statusAtual)) {
@@ -40,7 +40,9 @@ export default function AcoesDaOrdem({ ordem, aoAtualizar }) {
       const { data } = await requisitarComCsrf('patch', '/ordens-servico/' + ordem.id + '/' + acaoEscolhida[0]);
       aoAtualizar(data);
       setAcaoEscolhida(null);
-      setConfirmacao('Estado da ordem atualizado.');
+      setConfirmacao(acaoEscolhida[0] === 'devolver'
+        ? 'Devolução registrada. As peças estão em lavagem; libere-as no inventário após a conferência.'
+        : 'Estado da ordem atualizado.');
     } catch (falha) {
       setErro(falha.response?.data?.mensagem || 'Não foi possível atualizar a ordem. Tente novamente.');
     } finally {
@@ -71,6 +73,10 @@ export default function AcoesDaOrdem({ ordem, aoAtualizar }) {
             </p>
           )}
           {acaoEscolhida[0] === 'cancelar' && <p>O cancelamento encerra o fluxo desta ordem.</p>}
+          {acaoEscolhida[0] === 'devolver' && (
+            <p>Todas as peças desta locação serão encaminhadas à lavagem. Elas continuarão indisponíveis
+              até a conclusão da lavagem e a liberação após conferência no inventário.</p>
+          )}
           {erro && <Aviso>{erro}</Aviso>}
           <div className="modal-acoes">
             <button className="botao-secundario" type="button" disabled={salvando}
