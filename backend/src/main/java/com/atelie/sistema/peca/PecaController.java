@@ -1,6 +1,7 @@
 package com.atelie.sistema.peca;
 
 import com.atelie.sistema.peca.dto.PecaRequestDTO;
+import com.atelie.sistema.peca.dto.LiberacaoPecaRequestDTO;
 import com.atelie.sistema.peca.dto.PecaResponseDTO;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -55,7 +56,8 @@ public class PecaController {
     }
 
     @PatchMapping("/{id}/devolver")
-    public ResponseEntity<PecaResponseDTO> devolver(@PathVariable UUID id) {
-        return ResponseEntity.ok(pecaService.devolverParaEstoque(id));
+    public ResponseEntity<PecaResponseDTO> devolver(@PathVariable UUID id,
+            @RequestBody(required = false) LiberacaoPecaRequestDTO confirmacao) {
+        return ResponseEntity.ok(pecaService.devolverParaEstoque(id, confirmacao));
     }
 }

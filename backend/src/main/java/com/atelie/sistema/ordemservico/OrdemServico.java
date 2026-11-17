@@ -202,6 +202,10 @@ public class OrdemServico {
     }
 
     public void devolver() {
+        if (tipoFluxo != TipoFluxo.LOCACAO) {
+            throw new com.atelie.sistema.shared.exception.RegraNegocioException(
+                    "Somente ordens de locação podem ser devolvidas.");
+        }
         getEstado().devolver(this);
     }
 

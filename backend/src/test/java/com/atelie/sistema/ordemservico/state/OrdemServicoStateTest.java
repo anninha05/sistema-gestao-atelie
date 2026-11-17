@@ -63,6 +63,7 @@ class OrdemServicoStateTest {
         os.devolver();
         assertEquals(StatusOrdemServico.DEVOLVIDA, os.getStatusAtual());
         assertInstanceOf(Devolvida.class, os.getEstado());
+        assertThrows(RegraNegocioException.class, os::devolver);
     }
 
     @Test
@@ -81,5 +82,13 @@ class OrdemServicoStateTest {
         assertThrows(RegraNegocioException.class, os::retirar);
         assertThrows(RegraNegocioException.class, os::entregarAoCliente);
         assertEquals(StatusOrdemServico.CONCLUIDO, os.getStatusAtual());
+    }
+
+    @Test
+    void naoDeveDevolverSobMedidaMesmoComEstadoLegadoRetirada() {
+        var encomenda = new OrdemServico(os.getCliente(), TipoFluxo.SOB_MEDIDA, new BigDecimal("350.00"), null);
+        encomenda.setEstado(new Retirada());
+        assertThrows(RegraNegocioException.class, encomenda::devolver);
+        assertEquals(StatusOrdemServico.RETIRADA, encomenda.getStatusAtual());
     }
 }

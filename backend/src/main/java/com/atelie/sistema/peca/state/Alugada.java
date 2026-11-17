@@ -22,7 +22,7 @@ public class Alugada implements EstadoPeca {
 
     @Override
     public void devolverParaEstoque(Peca peca) {
-        peca.setEstado(new Disponivel());
+        throw new RegraNegocioException("Registre a devolução na ordem de serviço. A peça deve passar pela lavagem antes da liberação.");
     }
 
     @Override

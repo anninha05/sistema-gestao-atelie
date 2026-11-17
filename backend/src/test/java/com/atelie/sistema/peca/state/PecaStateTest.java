@@ -44,11 +44,11 @@ class PecaStateTest {
     @DisplayName("Deve enviar peça para lavagem e depois devolver ao estoque")
     void fluxoLavagemEDevolucao() {
         peca.marcarComoAlugada();
-        peca.enviarParaLavagem();
+        peca.devolverDaLocacao();
         assertEquals(StatusDisponibilidade.EM_LAVAGEM, peca.getStatusDisponibilidade());
         assertInstanceOf(EmLavagem.class, peca.getEstado());
 
-        peca.devolverParaEstoque();
+        peca.devolverParaEstoque(true, true);
         assertEquals(StatusDisponibilidade.DISPONIVEL, peca.getStatusDisponibilidade());
         assertInstanceOf(Disponivel.class, peca.getEstado());
     }
@@ -61,5 +61,45 @@ class PecaStateTest {
         assertInstanceOf(EmCostura.class, peca.getEstado());
 
         assertThrows(RegraNegocioException.class, () -> peca.marcarComoAlugada());
+    }
+
+    @Test
+    void naoDeveLiberarPecaAlugadaDiretamente() {
+        peca.marcarComoAlugada();
+        assertThrows(RegraNegocioException.class, () -> peca.devolverParaEstoque(true, true));
+        assertEquals(StatusDisponibilidade.ALUGADA, peca.getStatusDisponibilidade());
+    }
+
+    @Test
+    void deveExigirLavagemEConferenciaParaLiberar() {
+        peca.marcarComoAlugada();
+        peca.devolverDaLocacao();
+        assertThrows(RegraNegocioException.class, () -> peca.devolverParaEstoque(false, true));
+        assertThrows(RegraNegocioException.class, () -> peca.devolverParaEstoque(true, false));
+        assertEquals(StatusDisponibilidade.EM_LAVAGEM, peca.getStatusDisponibilidade());
+        assertThrows(RegraNegocioException.class, peca::retirarParaLocacao);
+        peca.devolverParaEstoque(true, true);
+        assertEquals(StatusDisponibilidade.DISPONIVEL, peca.getStatusDisponibilidade());
+    }
+
+    @Test
+    void deveManterPecaIndisponivelDuranteReparos() {
+        peca.marcarComoAlugada();
+        peca.devolverDaLocacao();
+        peca.enviarParaManutencao();
+        assertEquals(StatusDisponibilidade.EM_COSTURA, peca.getStatusDisponibilidade());
+        assertThrows(RegraNegocioException.class, peca::retirarParaLocacao);
+        assertThrows(RegraNegocioException.class, () -> peca.devolverParaEstoque(true, false));
+        peca.enviarParaLavagem();
+        peca.devolverParaEstoque(true, true);
+        assertEquals(StatusDisponibilidade.DISPONIVEL, peca.getStatusDisponibilidade());
+    }
+
+    @Test
+    void naoDeveDevolverPecaDisponivelOuSobMedida() {
+        assertThrows(RegraNegocioException.class, peca::devolverDaLocacao);
+        var modelo = new Peca("Modelo sob medida", TipoFluxo.SOB_MEDIDA);
+        modelo.setEstado(new Alugada());
+        assertThrows(RegraNegocioException.class, modelo::devolverDaLocacao);
     }
 }

@@ -163,7 +163,7 @@ public class OrdemServicoService {
 
     @Transactional
     public OrdemServicoResponseDTO retirar(UUID id) {
-        OrdemServico os = ordemServicoRepository.buscarParaRetirada(id)
+        OrdemServico os = ordemServicoRepository.buscarParaAtualizacao(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Ordem de serviço não encontrada com id: " + id));
         os.retirar();
         if (os.getTipoFluxo() == TipoFluxo.LOCACAO) {
@@ -186,8 +186,17 @@ public class OrdemServicoService {
 
     @Transactional
     public OrdemServicoResponseDTO devolver(UUID id) {
-        OrdemServico os = buscarEntidadePorId(id);
+        OrdemServico os = ordemServicoRepository.buscarParaAtualizacao(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Ordem de serviço não encontrada com id: " + id));
         os.devolver();
+        if (os.getItens().isEmpty()) {
+            throw new RegraNegocioException("A ordem não possui peças para devolução.");
+        }
+        for (UUID pecaId : os.getItens().stream().map(ItemOrdemServico::pecaId).sorted().toList()) {
+            Peca peca = pecaRepository.buscarParaReserva(pecaId)
+                    .orElseThrow(() -> new RecursoNaoEncontradoException("Peça não encontrada com id: " + pecaId));
+            peca.devolverDaLocacao();
+        }
         return toResponseDTO(os);
     }
 

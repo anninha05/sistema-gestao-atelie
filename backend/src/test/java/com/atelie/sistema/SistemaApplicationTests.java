@@ -10,6 +10,7 @@ import com.atelie.sistema.ordemservico.state.StatusOrdemServico;
 import com.atelie.sistema.peca.PecaService;
 import com.atelie.sistema.peca.TipoFluxo;
 import com.atelie.sistema.peca.dto.PecaRequestDTO;
+import com.atelie.sistema.peca.dto.LiberacaoPecaRequestDTO;
 import com.atelie.sistema.shared.exception.RegraNegocioException;
 import com.atelie.sistema.usuario.Perfil;
 import com.atelie.sistema.usuario.UsuarioService;
@@ -127,6 +128,7 @@ class SistemaApplicationTests {
                 new RegistrarPagamentoRequest(new BigDecimal("100.00"), LocalDate.of(2030, 10, 10), MetodoPagamento.PIX));
         ordens.retirar(ordem.id());
         ordens.devolver(ordem.id());
+        conferirEstados(ordem, StatusOrdemServico.DEVOLVIDA, StatusDisponibilidade.EM_LAVAGEM);
         assertTrue(ordens.disponivelNoPeriodo(peca.id(), inicio, fim));
 
         var pedidoPercentual = new OrdemServicoRequestDTO(cliente.id(), TipoFluxo.LOCACAO, List.of(peca.id()),
@@ -268,6 +270,173 @@ class SistemaApplicationTests {
         jdbc.update("delete from ordens_servico_pecas where ordem_servico_id = ?", ordem.id());
         assertThrows(RegraNegocioException.class, () -> ordens.retirar(ordem.id()));
         conferirEstados(ordem, StatusOrdemServico.CONCLUIDO, StatusDisponibilidade.DISPONIVEL);
+    }
+
+    @Test
+    void deveDevolverTodasAsPecasParaLavagemSemLiberarEstoque() {
+        var ordem = criarLocacaoRetirada(2);
+        assertEquals(StatusOrdemServico.DEVOLVIDA, ordens.devolver(ordem.id()).statusAtual());
+        conferirEstados(ordem, StatusOrdemServico.DEVOLVIDA, StatusDisponibilidade.EM_LAVAGEM);
+        for (var item : ordem.itens()) {
+            assertTrue(pecas.listarDisponiveis().stream().noneMatch(peca -> peca.id().equals(item.pecaId())));
+        }
+        assertThrows(RegraNegocioException.class, () -> ordens.devolver(ordem.id()));
+        conferirEstados(ordem, StatusOrdemServico.DEVOLVIDA, StatusDisponibilidade.EM_LAVAGEM);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = StatusOrdemServico.class, names = {"RETIRADA"}, mode = EnumSource.Mode.EXCLUDE)
+    void deveRejeitarDevolucaoForaDoEstadoRetirada(StatusOrdemServico estado) {
+        var ordem = criarOrdemPronta(TipoFluxo.LOCACAO, 1);
+        jdbc.update("update ordens_servico set status_atual = ? where id = ?", estado.name(), ordem.id());
+        assertThrows(RegraNegocioException.class, () -> ordens.devolver(ordem.id()));
+        conferirEstados(ordem, estado, StatusDisponibilidade.DISPONIVEL);
+    }
+
+    @Test
+    void deveReverterDevolucaoSeUmaPecaEstiverInconsistente() {
+        var ordem = criarLocacaoRetirada(2);
+        var ids = ordem.itens().stream().map(item -> item.pecaId()).sorted().toList();
+        jdbc.update("update pecas set estado_atual = 'DISPONIVEL' where id = ?", ids.getLast());
+        assertThrows(RegraNegocioException.class, () -> ordens.devolver(ordem.id()));
+        // Sem transação no teste: estas consultas leem o resultado persistido após o rollback.
+        assertEquals(StatusOrdemServico.RETIRADA, ordens.buscarPorId(ordem.id()).statusAtual());
+        assertEquals(StatusDisponibilidade.ALUGADA, pecas.buscarPorId(ids.getFirst()).status());
+        assertEquals(StatusDisponibilidade.DISPONIVEL, pecas.buscarPorId(ids.getLast()).status());
+    }
+
+    @Test
+    void deveRejeitarDevolucaoSemItens() {
+        var ordem = criarLocacaoRetirada(1);
+        jdbc.update("delete from ordens_servico_pecas where ordem_servico_id = ?", ordem.id());
+        assertThrows(RegraNegocioException.class, () -> ordens.devolver(ordem.id()));
+        conferirEstados(ordem, StatusOrdemServico.RETIRADA, StatusDisponibilidade.ALUGADA);
+    }
+
+    @Test
+    void devePreservarReservaFuturaEBloquearRetiradaAteLiberacao() {
+        var anterior = criarLocacaoRetirada(1);
+        var pecaId = anterior.itens().getFirst().pecaId();
+        var inicio = anterior.fimLocacao().plusDays(2);
+        var futura = ordens.abrirOrdemServico(new OrdemServicoRequestDTO(anterior.clienteId(), TipoFluxo.LOCACAO,
+                List.of(pecaId), null, inicio, inicio.plusDays(2), null, null, null, null, inicio, null));
+        ordens.enviarParaProva(futura.id());
+        ordens.iniciarPassadoria(futura.id());
+        ordens.concluir(futura.id());
+        quitar(futura);
+
+        ordens.devolver(anterior.id());
+        assertEquals(inicio, ordens.buscarPorId(futura.id()).inicioLocacao());
+        assertEquals(futura.fimLocacao(), ordens.buscarPorId(futura.id()).fimLocacao());
+        assertFalse(ordens.disponivelNoPeriodo(pecaId, inicio, futura.fimLocacao()));
+        assertThrows(RegraNegocioException.class, () -> ordens.retirar(futura.id()));
+        conferirEstados(futura, StatusOrdemServico.CONCLUIDO, StatusDisponibilidade.EM_LAVAGEM);
+        assertThrows(RegraNegocioException.class, () -> pecas.devolverParaEstoque(pecaId, null));
+        assertThrows(RegraNegocioException.class, () -> pecas.devolverParaEstoque(pecaId,
+                new LiberacaoPecaRequestDTO(false, true)));
+        assertThrows(RegraNegocioException.class, () -> pecas.devolverParaEstoque(pecaId,
+                new LiberacaoPecaRequestDTO(true, false)));
+
+        pecas.enviarParaCostura(pecaId);
+        assertThrows(RegraNegocioException.class, () -> ordens.retirar(futura.id()));
+        conferirEstados(futura, StatusOrdemServico.CONCLUIDO, StatusDisponibilidade.EM_COSTURA);
+        pecas.enviarParaLavagem(pecaId);
+        pecas.devolverParaEstoque(pecaId, new LiberacaoPecaRequestDTO(true, true));
+        conferirEstados(futura, StatusOrdemServico.CONCLUIDO, StatusDisponibilidade.DISPONIVEL);
+        assertEquals(StatusOrdemServico.RETIRADA, ordens.retirar(futura.id()).statusAtual());
+        conferirEstados(futura, StatusOrdemServico.RETIRADA, StatusDisponibilidade.ALUGADA);
+        assertEquals(StatusOrdemServico.DEVOLVIDA, ordens.buscarPorId(anterior.id()).statusAtual());
+    }
+
+    @Test
+    void deveManterManutencaoIndisponivelAteConferenciaExplicita() {
+        var ordem = criarLocacaoRetirada(1);
+        ordens.devolver(ordem.id());
+        var pecaId = ordem.itens().getFirst().pecaId();
+        jdbc.update("update pecas set estado_atual = 'MANUTENCAO' where id = ?", pecaId);
+        assertThrows(RegraNegocioException.class, () -> pecas.devolverParaEstoque(pecaId,
+                new LiberacaoPecaRequestDTO(true, false)));
+        assertEquals(StatusDisponibilidade.MANUTENCAO, pecas.buscarPorId(pecaId).status());
+        pecas.devolverParaEstoque(pecaId, new LiberacaoPecaRequestDTO(true, true));
+        conferirEstados(ordem, StatusOrdemServico.DEVOLVIDA, StatusDisponibilidade.DISPONIVEL);
+    }
+
+    @Test
+    void deveConfirmarSomenteUmaDevolucaoSimultanea() throws Exception {
+        var ordem = criarLocacaoRetirada(2);
+        var prontas = new CountDownLatch(2);
+        var iniciar = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            java.util.concurrent.Callable<Boolean> devolver = () -> {
+                prontas.countDown();
+                if (!iniciar.await(10, TimeUnit.SECONDS)) throw new AssertionError("Devoluções não iniciaram");
+                try {
+                    ordens.devolver(ordem.id());
+                    return true;
+                } catch (RegraNegocioException esperado) {
+                    return false;
+                }
+            };
+            var primeira = executor.submit(devolver);
+            var segunda = executor.submit(devolver);
+            assertTrue(prontas.await(10, TimeUnit.SECONDS));
+            iniciar.countDown();
+            assertNotEquals(primeira.get(20, TimeUnit.SECONDS), segunda.get(20, TimeUnit.SECONDS));
+        }
+        conferirEstados(ordem, StatusOrdemServico.DEVOLVIDA, StatusDisponibilidade.EM_LAVAGEM);
+    }
+
+    @Test
+    void deveIntegrarDevolucaoELiberacaoPelaApiComPermissoesECsrf() throws Exception {
+        var ordem = criarLocacaoRetirada(1);
+        var pecaId = ordem.itens().getFirst().pecaId();
+        var atendimento = autenticar(Perfil.ROLE_ATENDENTE);
+        var producao = autenticar(Perfil.ROLE_PRODUCAO);
+        var tokenAtendimento = obterToken(atendimento);
+        var tokenProducao = obterToken(producao);
+        var devolucao = "/ordens-servico/" + ordem.id() + "/devolver";
+        var liberacao = "/pecas/" + pecaId + "/devolver";
+        var confirmacao = "{\"lavagemConcluida\":true,\"condicoesConferidas\":true}";
+
+        mvc.perform(patch(devolucao).session(atendimento)).andExpect(status().isForbidden());
+        mvc.perform(patch(devolucao).session(producao).header("X-CSRF-TOKEN", tokenProducao))
+                .andExpect(status().isForbidden());
+        mvc.perform(patch(liberacao).session(atendimento).header("X-CSRF-TOKEN", tokenAtendimento)
+                .contentType("application/json").content(confirmacao)).andExpect(status().isBadRequest());
+        mvc.perform(patch("/pecas/" + pecaId + "/lavagem").session(producao).header("X-CSRF-TOKEN", tokenProducao))
+                .andExpect(status().isBadRequest());
+        conferirEstados(ordem, StatusOrdemServico.RETIRADA, StatusDisponibilidade.ALUGADA);
+
+        mvc.perform(patch(devolucao).session(atendimento).header("X-CSRF-TOKEN", tokenAtendimento))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.statusAtual").value("DEVOLVIDA"));
+        mvc.perform(get("/pecas/" + pecaId).session(producao))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("EM_LAVAGEM"));
+        mvc.perform(patch(devolucao).session(atendimento).header("X-CSRF-TOKEN", tokenAtendimento))
+                .andExpect(status().isBadRequest());
+        mvc.perform(patch(liberacao).session(producao).contentType("application/json").content(confirmacao))
+                .andExpect(status().isForbidden());
+        for (String corpo : List.of("{}", "{\"lavagemConcluida\":true}",
+                "{\"lavagemConcluida\":true,\"condicoesConferidas\":false}")) {
+            mvc.perform(patch(liberacao).session(producao).header("X-CSRF-TOKEN", tokenProducao)
+                    .contentType("application/json").content(corpo))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.mensagem").exists());
+        }
+        conferirEstados(ordem, StatusOrdemServico.DEVOLVIDA, StatusDisponibilidade.EM_LAVAGEM);
+        mvc.perform(patch(liberacao).session(producao).header("X-CSRF-TOKEN", tokenProducao)
+                .contentType("application/json").content(confirmacao))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("DISPONIVEL"));
+        conferirEstados(ordem, StatusOrdemServico.DEVOLVIDA, StatusDisponibilidade.DISPONIVEL);
+    }
+
+    private String obterToken(MockHttpSession sessao) throws Exception {
+        var resposta = mvc.perform(get("/auth/csrf").session(sessao)).andExpect(status().isOk()).andReturn();
+        return json.readTree(resposta.getResponse().getContentAsString()).get("token").asString();
+    }
+
+    private OrdemServicoResponseDTO criarLocacaoRetirada(int quantidade) {
+        var ordem = criarOrdemPronta(TipoFluxo.LOCACAO, quantidade);
+        quitar(ordem);
+        return ordens.retirar(ordem.id());
     }
 
     private OrdemServicoResponseDTO criarOrdemPronta(TipoFluxo tipo, int quantidade) {

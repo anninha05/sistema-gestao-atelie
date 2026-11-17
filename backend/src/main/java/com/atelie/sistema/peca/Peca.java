@@ -110,7 +110,19 @@ public class Peca {
         getEstado().enviarParaLavagem(this);
     }
 
-    public void devolverParaEstoque() {
+    public void devolverDaLocacao() {
+        if (tipo != TipoFluxo.LOCACAO || statusDisponibilidade != StatusDisponibilidade.ALUGADA) {
+            throw new com.atelie.sistema.shared.exception.RegraNegocioException(
+                    "A peça " + codigoEtiqueta + " precisa estar alugada para registrar sua devolução.");
+        }
+        getEstado().enviarParaLavagem(this);
+    }
+
+    public void devolverParaEstoque(boolean lavagemConcluida, boolean condicoesConferidas) {
+        if (!lavagemConcluida || !condicoesConferidas) {
+            throw new com.atelie.sistema.shared.exception.RegraNegocioException(
+                    "Confirme a lavagem concluída e as condições da peça antes de liberá-la ao estoque.");
+        }
         getEstado().devolverParaEstoque(this);
     }
 

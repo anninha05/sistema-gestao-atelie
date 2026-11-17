@@ -1,6 +1,7 @@
 package com.atelie.sistema.peca;
 
 import com.atelie.sistema.peca.dto.PecaRequestDTO;
+import com.atelie.sistema.peca.dto.LiberacaoPecaRequestDTO;
 import com.atelie.sistema.peca.dto.PecaResponseDTO;
 import com.atelie.sistema.peca.state.StatusDisponibilidade;
 import com.atelie.sistema.shared.exception.RecursoNaoEncontradoException;
@@ -68,30 +69,40 @@ public class PecaService {
 
     @Transactional
     public PecaResponseDTO marcarComoAlugada(UUID id) {
-        Peca peca = buscarEntidadePorId(id);
+        Peca peca = buscarParaAtualizacao(id);
         peca.marcarComoAlugada();
         return toResponseDTO(pecaRepository.save(peca));
     }
 
     @Transactional
     public PecaResponseDTO enviarParaCostura(UUID id) {
-        Peca peca = buscarEntidadePorId(id);
+        Peca peca = buscarParaAtualizacao(id);
         peca.enviarParaCostura();
         return toResponseDTO(pecaRepository.save(peca));
     }
 
     @Transactional
     public PecaResponseDTO enviarParaLavagem(UUID id) {
-        Peca peca = buscarEntidadePorId(id);
+        Peca peca = buscarParaAtualizacao(id);
+        if (peca.getStatusDisponibilidade() == StatusDisponibilidade.ALUGADA) {
+            throw new com.atelie.sistema.shared.exception.RegraNegocioException(
+                    "Registre a devolução na ordem de serviço para encaminhar a peça à lavagem.");
+        }
         peca.enviarParaLavagem();
         return toResponseDTO(pecaRepository.save(peca));
     }
 
     @Transactional
-    public PecaResponseDTO devolverParaEstoque(UUID id) {
-        Peca peca = buscarEntidadePorId(id);
-        peca.devolverParaEstoque();
+    public PecaResponseDTO devolverParaEstoque(UUID id, LiberacaoPecaRequestDTO confirmacao) {
+        Peca peca = buscarParaAtualizacao(id);
+        peca.devolverParaEstoque(confirmacao != null && Boolean.TRUE.equals(confirmacao.lavagemConcluida()),
+                confirmacao != null && Boolean.TRUE.equals(confirmacao.condicoesConferidas()));
         return toResponseDTO(pecaRepository.save(peca));
+    }
+
+    private Peca buscarParaAtualizacao(UUID id) {
+        return pecaRepository.buscarParaReserva(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Peça não encontrada com id: " + id));
     }
 
     private PecaResponseDTO toResponseDTO(Peca p) {

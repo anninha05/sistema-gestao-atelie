@@ -36,6 +36,7 @@ public class SecurityConfig {
                         .requestMatchers("/auth/csrf", "/auth/login").permitAll()
                         .requestMatchers("/usuarios/**", "/financeiro/**").hasRole("ADMIN")
                         .requestMatchers("/ordens-servico/*/pagamentos/**").hasAnyRole("ADMIN", "ATENDENTE")
+                        .requestMatchers(HttpMethod.PATCH, "/pecas/*/devolver").hasAnyRole("ADMIN", "ATENDENTE", "PRODUCAO")
                         .requestMatchers(HttpMethod.PATCH, "/ordens-servico/*/confeccao",
                                 "/ordens-servico/*/prova", "/ordens-servico/*/passadoria",
                                 "/ordens-servico/*/concluir", "/pecas/*/costura",
