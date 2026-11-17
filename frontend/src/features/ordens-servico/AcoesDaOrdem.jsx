@@ -65,6 +65,11 @@ export default function AcoesDaOrdem({ ordem, aoAtualizar }) {
       {acaoEscolhida && (
         <Modal titulo={acaoEscolhida[1]} ocupado={salvando} aoFechar={() => setAcaoEscolhida(null)}>
           <p>Confirma esta ação na ordem de {ordem.clienteNome}?</p>
+          {acaoEscolhida[0] === 'retirar' && (
+            <p>A ordem precisa estar quitada e com a produção concluída.
+              {ordem.tipoFluxo === 'LOCACAO' && ' As peças também precisam estar disponíveis no inventário e serão marcadas como alugadas.'}
+            </p>
+          )}
           {acaoEscolhida[0] === 'cancelar' && <p>O cancelamento encerra o fluxo desta ordem.</p>}
           {erro && <Aviso>{erro}</Aviso>}
           <div className="modal-acoes">
