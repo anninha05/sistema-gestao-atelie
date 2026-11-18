@@ -163,10 +163,54 @@ class SistemaApplicationTests {
     void perfilProducaoNaoPodeConsultarNemConfigurarPrecificacao() throws Exception {
         var producao = autenticar(Perfil.ROLE_PRODUCAO);
         mvc.perform(get("/precificacao/politica").session(producao)).andExpect(status().isForbidden());
+        mvc.perform(get("/precificacao/atualizacoes").session(producao).param("mes", java.time.YearMonth.now().toString()))
+                .andExpect(status().isForbidden());
         mvc.perform(put("/precificacao/politica").session(producao)
                 .header("X-CSRF-TOKEN", obterToken(producao)).contentType("application/json")
                 .content("{}"))
                 .andExpect(status().isForbidden());
+        mvc.perform(post("/precificacao/atualizacao-diaria").session(producao)
+                .header("X-CSRF-TOKEN", obterToken(producao)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void atualizacaoPidDiariaEIdempotenteEAuditavel() throws Exception {
+        var admin = autenticar(Perfil.ROLE_ADMIN);
+        var mesAtual = java.time.YearMonth.now();
+        var token = obterToken(admin);
+        mvc.perform(put("/precificacao/metas/" + mesAtual).session(admin).header("X-CSRF-TOKEN", token)
+                .contentType("application/json")
+                .content("""
+                        {"valorMeta":10000.00,"indicador":"RESULTADO_DE_CAIXA"}
+                        """))
+                .andExpect(status().isOk());
+        token = obterToken(admin);
+        mvc.perform(put("/precificacao/politica").session(admin).header("X-CSRF-TOKEN", token)
+                .contentType("application/json")
+                .content("""
+                        {"ganhoProporcional":0.1,"ganhoIntegral":0.01,"ganhoDerivativo":0.1,
+                         "ajusteMinimo":-0.05,"ajusteMaximo":0.05,
+                         "descontoFidelidade":null,"quantidadeOsFidelidade":null}
+                        """))
+                .andExpect(status().isOk());
+
+        token = obterToken(admin);
+        var primeira = mvc.perform(post("/precificacao/atualizacao-diaria").session(admin)
+                .header("X-CSRF-TOKEN", token)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.mes").value(mesAtual.toString()))
+                .andExpect(jsonPath("$.dataApuracao").value(LocalDate.now().toString()))
+                .andExpect(jsonPath("$.referenciaAcumulada").exists())
+                .andExpect(jsonPath("$.ajusteLimitado").exists()).andReturn();
+        long idPrimeira = json.readTree(primeira.getResponse().getContentAsString()).get("id").asLong();
+        var segunda = mvc.perform(post("/precificacao/atualizacao-diaria").session(admin)
+                .header("X-CSRF-TOKEN", token)).andExpect(status().isOk()).andReturn();
+        long idSegunda = json.readTree(segunda.getResponse().getContentAsString()).get("id").asLong();
+
+        assertEquals(idPrimeira, idSegunda);
+        mvc.perform(get("/precificacao/atualizacoes").session(admin).param("mes", mesAtual.toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(idPrimeira))
+                .andExpect(jsonPath("$[0].responsavelNome").value("Teste retirada"));
     }
 
     @Test

@@ -2,8 +2,10 @@ package com.atelie.sistema.precificacao;
 
 import com.atelie.sistema.shared.exception.RegraNegocioException;
 import java.math.BigDecimal;
+import org.springframework.stereotype.Component;
 
 /** Implementação manual do PID discreto usado pela precificação do Linho. */
+@Component
 public class ControladorPID {
     public double normalizarErro(BigDecimal metaMensal, BigDecimal resultadoRealizado,
             int diaAtual, int diasNoMes) {
