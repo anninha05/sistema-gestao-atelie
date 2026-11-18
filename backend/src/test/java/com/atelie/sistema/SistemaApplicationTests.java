@@ -128,6 +128,48 @@ class SistemaApplicationTests {
     }
 
     @Test
+    void permiteGerenciaConfigurarMetaEPoliticaDePrecificacao() throws Exception {
+        var admin = autenticar(Perfil.ROLE_ADMIN);
+        var mes = java.time.YearMonth.now().plusMonths(3).toString();
+        var token = obterToken(admin);
+        mvc.perform(put("/precificacao/metas/" + mes).session(admin).header("X-CSRF-TOKEN", token)
+                .contentType("application/json")
+                .content("""
+                        {"valorMeta":12500.00,"indicador":"RESULTADO_DE_CAIXA"}
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mes").value(mes))
+                .andExpect(jsonPath("$.valorMeta").value(12500.00))
+                .andExpect(jsonPath("$.responsavelNome").value("Teste retirada"));
+        mvc.perform(get("/precificacao/metas/" + mes).session(admin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.indicador").value("RESULTADO_DE_CAIXA"));
+
+        token = obterToken(admin);
+        mvc.perform(put("/precificacao/politica").session(admin).header("X-CSRF-TOKEN", token)
+                .contentType("application/json")
+                .content("""
+                        {"ganhoProporcional":0.4,"ganhoIntegral":0.02,"ganhoDerivativo":0.1,
+                         "ajusteMinimo":-0.05,"ajusteMaximo":0.05,
+                         "descontoFidelidade":0.1,"quantidadeOsFidelidade":3}
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ajusteMinimo").value(-0.05))
+                .andExpect(jsonPath("$.quantidadeOsFidelidade").value(3));
+        mvc.perform(get("/precificacao/politica").session(admin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.descontoFidelidade").value(0.1));
+    }
+
+    @Test
+    void perfilProducaoNaoPodeConsultarNemConfigurarPrecificacao() throws Exception {
+        var producao = autenticar(Perfil.ROLE_PRODUCAO);
+        mvc.perform(get("/precificacao/politica").session(producao)).andExpect(status().isForbidden());
+        mvc.perform(put("/precificacao/politica").session(producao)
+                .header("X-CSRF-TOKEN", obterToken(producao)).contentType("application/json")
+                .content("{}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void devePersistirReservaFluxoERecebimento() throws Exception {
         var cpf = gerarCpfParaTeste();
         var cliente = clientes.cadastrarCliente(new ClienteRequestDTO("Cliente teste", "22999999999", "teste@email.com", cpf));
