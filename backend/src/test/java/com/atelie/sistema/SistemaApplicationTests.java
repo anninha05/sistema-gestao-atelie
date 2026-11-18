@@ -115,6 +115,19 @@ class SistemaApplicationTests {
     }
 
     @Test
+    void consolidadoFinanceiroMensalERestritoAGerencia() throws Exception {
+        var admin = autenticar(Perfil.ROLE_ADMIN);
+        mvc.perform(get("/financeiro/indicadores").session(admin).param("mes", "2026-11"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mes").value("2026-11"))
+                .andExpect(jsonPath("$.resultadoDeCaixa").exists())
+                .andExpect(jsonPath("$.saldoTotalAReceber").exists());
+        var producao = autenticar(Perfil.ROLE_PRODUCAO);
+        mvc.perform(get("/financeiro/indicadores").session(producao).param("mes", "2026-11"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void devePersistirReservaFluxoERecebimento() throws Exception {
         var cpf = gerarCpfParaTeste();
         var cliente = clientes.cadastrarCliente(new ClienteRequestDTO("Cliente teste", "22999999999", "teste@email.com", cpf));
