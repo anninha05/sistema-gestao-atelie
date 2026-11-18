@@ -214,6 +214,48 @@ class SistemaApplicationTests {
     }
 
     @Test
+    void simulaERegistraSugestaoSemAlterarValorDaOrdem() throws Exception {
+        var cliente = clientes.cadastrarCliente(new ClienteRequestDTO("Cliente PID", "22999999999",
+                "pid-" + UUID.randomUUID() + "@email.com", gerarCpfParaTeste()));
+        var peca = pecas.cadastrarPeca(new PecaRequestDTO("Peça PID", TipoFluxo.LOCACAO,
+                new BigDecimal("150.00"), "M", "Rosa"));
+        var ordem = ordens.abrirOrdemServico(new OrdemServicoRequestDTO(cliente.id(), TipoFluxo.LOCACAO,
+                List.of(peca.id()), null, LocalDateTime.now().plusDays(10), LocalDateTime.now().plusDays(12),
+                null, null, null, null, LocalDateTime.now().plusDays(11), null));
+        var valorOriginal = ordem.valorTotal();
+        var admin = autenticar(Perfil.ROLE_ADMIN);
+        var token = obterToken(admin);
+        mvc.perform(put("/precificacao/politica").session(admin).header("X-CSRF-TOKEN", token)
+                .contentType("application/json")
+                .content("""
+                        {"ganhoProporcional":0.1,"ganhoIntegral":0,"ganhoDerivativo":0,
+                         "ajusteMinimo":-0.05,"ajusteMaximo":0.05,
+                         "descontoFidelidade":null,"quantidadeOsFidelidade":null}
+                        """))
+                .andExpect(status().isOk());
+
+        String pedido = "{\"ordemServicoId\":\"" + ordem.id() + "\",\"pisoMinimo\":100.00}";
+        token = obterToken(admin);
+        var simulacao = mvc.perform(post("/precificacao/simular").session(admin).header("X-CSRF-TOKEN", token)
+                .contentType("application/json").content(pedido))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").doesNotExist())
+                .andExpect(jsonPath("$.precoBase").value(150.00))
+                .andExpect(jsonPath("$.precoSugerido").exists()).andReturn();
+        assertEquals(valorOriginal, ordens.buscarPorId(ordem.id()).valorTotal());
+
+        token = obterToken(admin);
+        var criada = mvc.perform(post("/precificacao/sugestoes").session(admin).header("X-CSRF-TOKEN", token)
+                .contentType("application/json").content(pedido))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.justificativa").isNotEmpty()).andReturn();
+        long id = json.readTree(criada.getResponse().getContentAsString()).get("id").asLong();
+        mvc.perform(get("/precificacao/sugestoes/" + id).session(admin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.ordemServicoId").value(ordem.id().toString()));
+        assertEquals(valorOriginal, ordens.buscarPorId(ordem.id()).valorTotal());
+        assertTrue(json.readTree(simulacao.getResponse().getContentAsString()).get("id").isNull());
+    }
+
+    @Test
     void devePersistirReservaFluxoERecebimento() throws Exception {
         var cpf = gerarCpfParaTeste();
         var cliente = clientes.cadastrarCliente(new ClienteRequestDTO("Cliente teste", "22999999999", "teste@email.com", cpf));

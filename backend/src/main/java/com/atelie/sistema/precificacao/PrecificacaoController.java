@@ -5,6 +5,8 @@ import com.atelie.sistema.precificacao.dto.MetaMensalResponse;
 import com.atelie.sistema.precificacao.dto.PoliticaPrecificacaoRequest;
 import com.atelie.sistema.precificacao.dto.PoliticaPrecificacaoResponse;
 import com.atelie.sistema.precificacao.dto.ExecucaoPIDResponse;
+import com.atelie.sistema.precificacao.dto.SugestaoPrecoRequest;
+import com.atelie.sistema.precificacao.dto.SugestaoPrecoResponse;
 import java.time.YearMonth;
 import java.util.List;
 import org.springframework.security.core.Authentication;
@@ -21,10 +23,13 @@ import org.springframework.web.bind.annotation.RestController;
 class PrecificacaoController {
     private final ConfiguracaoPrecificacaoService configuracao;
     private final AtualizacaoDiariaPIDService atualizacoes;
+    private final AgentePrecificacaoService agente;
 
-    PrecificacaoController(ConfiguracaoPrecificacaoService configuracao, AtualizacaoDiariaPIDService atualizacoes) {
+    PrecificacaoController(ConfiguracaoPrecificacaoService configuracao, AtualizacaoDiariaPIDService atualizacoes,
+            AgentePrecificacaoService agente) {
         this.configuracao = configuracao;
         this.atualizacoes = atualizacoes;
+        this.agente = agente;
     }
 
     @GetMapping("/metas/{mes}")
@@ -57,5 +62,20 @@ class PrecificacaoController {
     @GetMapping("/atualizacoes")
     List<ExecucaoPIDResponse> listarAtualizacoes(@org.springframework.web.bind.annotation.RequestParam YearMonth mes) {
         return atualizacoes.listar(mes);
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/simular")
+    SugestaoPrecoResponse simular(@RequestBody SugestaoPrecoRequest request, Authentication autenticacao) {
+        return agente.simular(request, autenticacao.getName());
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/sugestoes")
+    SugestaoPrecoResponse gerarSugestao(@RequestBody SugestaoPrecoRequest request, Authentication autenticacao) {
+        return agente.gerarSugestao(request, autenticacao.getName());
+    }
+
+    @GetMapping("/sugestoes/{id}")
+    SugestaoPrecoResponse buscarSugestao(@PathVariable Long id) {
+        return agente.buscar(id);
     }
 }
