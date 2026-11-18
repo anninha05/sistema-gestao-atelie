@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Catalogo from '../../shared/Catalogo.jsx';
 import { Aviso, Modal, Selecao, validarCampos } from '../../shared/Interface.jsx';
-import { requisitarComCsrf } from '../../shared/api.js';
+import { api, requisitarComCsrf } from '../../shared/api.js';
+import './financeiro.css';
 
 const caminhoDespesas = '/financeiro/despesas';
 const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -77,8 +78,42 @@ function BaixaDespesa({ despesa, aoAtualizar }) {
 
 export default function RelatoriosPage({ titulo }) {
   const [situacao, setSituacao] = useState('');
+  const [mes, setMes] = useState(() => {
+    const agora = new Date();
+    return agora.getFullYear() + '-' + String(agora.getMonth() + 1).padStart(2, '0');
+  });
+  const [indicadores, setIndicadores] = useState(null);
+  const [erroIndicadores, setErroIndicadores] = useState(false);
+
+  useEffect(() => {
+    const controlador = new AbortController();
+    setIndicadores(null);
+    setErroIndicadores(false);
+    api.get('/financeiro/indicadores', { params: { mes }, signal: controlador.signal })
+      .then(({ data }) => { setIndicadores(data); setErroIndicadores(false); })
+      .catch(() => { if (!controlador.signal.aborted) setErroIndicadores(true); });
+    return () => controlador.abort();
+  }, [mes]);
 
   return (
+    <>
+    <section className="financeiro-resumo" aria-label="Consolidado financeiro mensal">
+      <div className="financeiro-resumo-cabecalho"><div><h2>Resumo de caixa</h2>
+        <p>Valores efetivamente recebidos e despesas pagas por data de liquidação.</p></div>
+        <label>Mês<input type="month" value={mes} onChange={(evento) => setMes(evento.target.value)} /></label>
+      </div>
+      {erroIndicadores && <Aviso>Não foi possível carregar o consolidado financeiro.</Aviso>}
+      {!indicadores && !erroIndicadores && <p role="status">Carregando consolidado…</p>}
+      {indicadores && <>
+        <dl className="financeiro-resumo-valores">
+          <div><dt>Recebimentos realizados</dt><dd>{moeda.format(indicadores.recebimentosRealizados)}</dd></div>
+          <div><dt>Despesas pagas</dt><dd>{moeda.format(indicadores.despesasPagas)}</dd></div>
+          <div><dt>Resultado de caixa</dt><dd>{moeda.format(indicadores.resultadoDeCaixa)}</dd></div>
+          <div><dt>Saldo total a receber</dt><dd>{moeda.format(indicadores.saldoTotalAReceber)}</dd></div>
+        </dl>
+        <p className="financeiro-resumo-observacao">{indicadores.observacao}</p>
+      </>}
+    </section>
     <Catalogo titulo={titulo} descricao="Cadastre despesas e acompanhe os pagamentos do ateliê."
       caminho={caminhoDespesas} rotuloCadastro="Nova despesa" rotuloBusca="Buscar por descrição ou categoria"
       correspondeABusca={(despesa, busca) => {
@@ -125,5 +160,6 @@ export default function RelatoriosPage({ titulo }) {
         }} />
       )}
     />
+    </>
   );
 }
