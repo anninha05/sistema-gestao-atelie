@@ -561,7 +561,8 @@ class SistemaApplicationTests {
         conferirEstados(ordem, StatusOrdemServico.DEVOLVIDA, StatusDisponibilidade.EM_LAVAGEM);
         mvc.perform(patch(liberacao).session(producao).header("X-CSRF-TOKEN", tokenProducao)
                 .contentType("application/json").content(confirmacao))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("DISPONIVEL"));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("DISPONIVEL"))
+                .andExpect(jsonPath("$.valorBase").doesNotExist());
         conferirEstados(ordem, StatusOrdemServico.DEVOLVIDA, StatusDisponibilidade.DISPONIVEL);
     }
 
