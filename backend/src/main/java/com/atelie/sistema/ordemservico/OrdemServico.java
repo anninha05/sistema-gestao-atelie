@@ -215,6 +215,20 @@ public class OrdemServico {
         getEstado().devolver(this);
     }
 
+    public void reagendar(LocalDateTime inicioLocacao, LocalDateTime fimLocacao,
+            LocalDateTime dataProva, LocalDateTime dataEvento, LocalDateTime dataEntrega) {
+        if (statusAtual == StatusOrdemServico.RETIRADA || statusAtual == StatusOrdemServico.ENTREGUE
+                || statusAtual == StatusOrdemServico.DEVOLVIDA || statusAtual == StatusOrdemServico.CANCELADA) {
+            throw new com.atelie.sistema.shared.exception.RegraNegocioException(
+                    "Não é possível reagendar uma ordem já retirada, entregue, devolvida ou cancelada.");
+        }
+        this.inicioLocacao = tipoFluxo == TipoFluxo.LOCACAO ? inicioLocacao : null;
+        this.fimLocacao = tipoFluxo == TipoFluxo.LOCACAO ? fimLocacao : null;
+        this.dataProva = dataProva;
+        this.dataEvento = dataEvento;
+        this.dataEntrega = dataEntrega;
+    }
+
     // PAGAMENTO (COMPOSIÇÃO)
 
     public void registrarSinal(BigDecimal valor, LocalDate data) {

@@ -19,6 +19,16 @@ public interface OrdemServicoRepository extends JpaRepository<OrdemServico, UUID
             """)
     long contarReservas(UUID peca, java.time.LocalDateTime inicio, java.time.LocalDateTime fim);
 
+    @org.springframework.data.jpa.repository.Query("""
+            select count(i) from OrdemServico os join os.itens i
+            where i.pecaId = :peca and os.id <> :ordemId
+              and os.inicioLocacao < :fim and os.fimLocacao > :inicio
+              and os.statusAtual not in (com.atelie.sistema.ordemservico.state.StatusOrdemServico.DEVOLVIDA,
+                                         com.atelie.sistema.ordemservico.state.StatusOrdemServico.CANCELADA)
+            """)
+    long contarReservasDeOutrasOrdens(UUID peca, java.time.LocalDateTime inicio,
+            java.time.LocalDateTime fim, UUID ordemId);
+
     List<OrdemServico> findByStatusAtual(StatusOrdemServico statusAtual);
 
     List<OrdemServico> findByClienteId(UUID clienteId);

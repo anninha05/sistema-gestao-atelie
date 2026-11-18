@@ -4,6 +4,7 @@ import com.atelie.sistema.ordemservico.dto.OrdemServicoRequestDTO;
 import com.atelie.sistema.ordemservico.dto.OrdemServicoResponseDTO;
 import com.atelie.sistema.ordemservico.dto.PagamentoResponse;
 import com.atelie.sistema.ordemservico.dto.RegistrarPagamentoRequest;
+import com.atelie.sistema.ordemservico.dto.ReagendarOrdemServicoRequest;
 import com.atelie.sistema.ordemservico.state.StatusOrdemServico;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -43,6 +44,12 @@ public class OrdemServicoController {
     @GetMapping("/{id}")
     public ResponseEntity<OrdemServicoResponseDTO> buscarPorId(@PathVariable UUID id) {
         return ResponseEntity.ok(ordemServicoService.buscarPorId(id));
+    }
+
+    @PatchMapping("/{id}/reagendar")
+    public ResponseEntity<OrdemServicoResponseDTO> reagendar(@PathVariable UUID id,
+            @RequestBody ReagendarOrdemServicoRequest request) {
+        return ResponseEntity.ok(ordemServicoService.reagendar(id, request));
     }
 
     @GetMapping("/status/{status}")

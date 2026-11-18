@@ -6,6 +6,7 @@ import com.atelie.sistema.ordemservico.dto.OrdemServicoRequestDTO;
 import com.atelie.sistema.ordemservico.dto.OrdemServicoResponseDTO;
 import com.atelie.sistema.ordemservico.dto.PagamentoResponse;
 import com.atelie.sistema.ordemservico.dto.RegistrarPagamentoRequest;
+import com.atelie.sistema.ordemservico.dto.ReagendarOrdemServicoRequest;
 import com.atelie.sistema.ordemservico.state.StatusOrdemServico;
 import com.atelie.sistema.shared.exception.RecursoNaoEncontradoException;
 import com.atelie.sistema.peca.Peca;
@@ -173,6 +174,34 @@ public class OrdemServicoService {
         OrdemServico os = ordemServicoRepository.buscarParaAtualizacao(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Ordem de serviço não encontrada com id: " + id));
         os.cancelar();
+        return toResponseDTO(os);
+    }
+
+    @Transactional
+    public OrdemServicoResponseDTO reagendar(UUID id, ReagendarOrdemServicoRequest request) {
+        OrdemServico os = ordemServicoRepository.buscarParaAtualizacao(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Ordem de serviço não encontrada com id: " + id));
+        if (request == null) throw new RegraNegocioException("Informe as novas datas da ordem.");
+        if (os.getTipoFluxo() == TipoFluxo.LOCACAO
+                && (request.inicioLocacao() == null || request.fimLocacao() == null
+                    || !request.inicioLocacao().isBefore(request.fimLocacao()))) {
+            throw new RegraNegocioException("Informe um período de locação válido.");
+        }
+        if (os.getTipoFluxo() == TipoFluxo.LOCACAO) {
+            for (UUID pecaId : os.getItens().stream().map(ItemOrdemServico::pecaId).sorted().toList()) {
+                Peca peca = pecaRepository.buscarParaReserva(pecaId)
+                        .orElseThrow(() -> new RecursoNaoEncontradoException("Peça não encontrada com id: " + pecaId));
+                if (peca.getTipo() != TipoFluxo.LOCACAO
+                        || ordemServicoRepository.contarReservasDeOutrasOrdens(pecaId, request.inicioLocacao(), request.fimLocacao(), id) > 0) {
+                    throw new RegraNegocioException("A nova data conflita com outra reserva da peça " + peca.getCodigoEtiqueta() + ".");
+                }
+                if (!request.inicioLocacao().isAfter(java.time.LocalDateTime.now())
+                        && peca.getStatusDisponibilidade() != com.atelie.sistema.peca.state.StatusDisponibilidade.DISPONIVEL) {
+                    throw new RegraNegocioException("A peça não está fisicamente disponível para uma locação com início imediato.");
+                }
+            }
+        }
+        os.reagendar(request.inicioLocacao(), request.fimLocacao(), request.dataProva(), request.dataEvento(), request.dataEntrega());
         return toResponseDTO(os);
     }
 
