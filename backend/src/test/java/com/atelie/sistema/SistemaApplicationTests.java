@@ -136,6 +136,10 @@ class SistemaApplicationTests {
         var ordemComPercentual = ordens.abrirOrdemServico(pedidoPercentual);
         assertEquals(new BigDecimal("10.01"), ordemComPercentual.desconto());
         assertEquals(new BigDecimal("139.99"), ordemComPercentual.valorTotal());
+
+        var sessao = autenticar(Perfil.ROLE_ATENDENTE);
+        mvc.perform(get("/clientes/" + cliente.id() + "/ordens-servico").session(sessao))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[?(@.id == '" + ordem.id() + "')]").isArray());
     }
 
     @Test

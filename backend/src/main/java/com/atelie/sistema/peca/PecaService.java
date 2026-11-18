@@ -62,6 +62,31 @@ public class PecaService {
         return toResponseDTO(buscarEntidadePorId(id));
     }
 
+    @Transactional
+    public PecaResponseDTO atualizar(UUID id, PecaRequestDTO dto) {
+        validarDados(dto, false);
+        Peca peca = buscarParaAtualizacao(id);
+        peca.atualizarDadosDoCatalogo(dto.descricao().strip(), dto.valorBase(),
+                normalizarOpcional(dto.tamanho()), normalizarOpcional(dto.cor()));
+        return toResponseDTO(peca);
+    }
+
+    private void validarDados(PecaRequestDTO dto, boolean exigirTipo) {
+        if (dto == null || (exigirTipo && dto.tipo() == null) || dto.descricao() == null || dto.descricao().isBlank()
+                || dto.descricao().length() > 255
+                || (dto.tamanho() != null && dto.tamanho().length() > 10)
+                || (dto.cor() != null && dto.cor().length() > 50)
+                || dto.valorBase() == null || dto.valorBase().signum() < 0
+                || dto.valorBase().stripTrailingZeros().scale() > 2
+                || dto.valorBase().compareTo(new java.math.BigDecimal("99999999.99")) > 0) {
+            throw new com.atelie.sistema.shared.exception.RegraNegocioException("Dados da peça inválidos.");
+        }
+    }
+
+    private String normalizarOpcional(String valor) {
+        return valor == null || valor.isBlank() ? null : valor.strip();
+    }
+
     public Peca buscarEntidadePorId(UUID id) {
         return pecaRepository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Peça não encontrada com id: " + id));

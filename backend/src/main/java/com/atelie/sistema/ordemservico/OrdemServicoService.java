@@ -125,6 +125,12 @@ public class OrdemServicoService {
     }
 
     @Transactional(readOnly = true)
+    public List<OrdemServicoResponseDTO> listarPorCliente(UUID clienteId) {
+        clienteService.buscarEntidadePorId(clienteId);
+        return ordemServicoRepository.findByClienteId(clienteId).stream().map(this::toResponseDTO).toList();
+    }
+
+    @Transactional(readOnly = true)
     public OrdemServicoResponseDTO buscarPorId(UUID id) {
         return toResponseDTO(buscarEntidadePorId(id));
     }

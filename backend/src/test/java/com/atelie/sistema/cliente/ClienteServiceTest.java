@@ -13,6 +13,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import java.util.Optional;
+import java.util.UUID;
 
 @ExtendWith(MockitoExtension.class)
 class ClienteServiceTest {
@@ -85,5 +87,30 @@ class ClienteServiceTest {
         var dto = new ClienteRequestDTO("Maria", "+55 (22) 99999-9999", "maria@email.com", "52998224725");
         var resposta = clienteService.cadastrarCliente(dto);
         assertEquals("22999999999", resposta.telefone());
+    }
+
+    @Test
+    void deveAtualizarClienteMantendoCpfProprioEValidandoDados() {
+        UUID id = UUID.randomUUID();
+        Cliente cliente = new Cliente("Maria", "22999999999", "maria@email.com", "52998224725");
+        when(clienteRepository.findById(id)).thenReturn(Optional.of(cliente));
+        when(clienteRepository.existsByCpfAndIdNot("52998224725", id)).thenReturn(false);
+
+        ClienteResponseDTO resposta = clienteService.atualizar(id,
+                new ClienteRequestDTO("Maria Silva", "(22) 98888-7777", "maria.silva@email.com", "529.982.247-25"));
+
+        assertEquals("Maria Silva", resposta.nome());
+        assertEquals("22988887777", resposta.telefone());
+        verify(clienteRepository).existsByCpfAndIdNot("52998224725", id);
+    }
+
+    @Test
+    void deveRejeitarEdicaoComCpfDeOutroCliente() {
+        UUID id = UUID.randomUUID();
+        when(clienteRepository.findById(id)).thenReturn(Optional.of(new Cliente("Maria", "22999999999", "maria@email.com", "52998224725")));
+        when(clienteRepository.existsByCpfAndIdNot("11144477735", id)).thenReturn(true);
+        assertThrows(RegraNegocioException.class, () -> clienteService.atualizar(id,
+                new ClienteRequestDTO("Maria", "22999999999", "maria@email.com", "11144477735")));
+        verify(clienteRepository, never()).save(any());
     }
 }

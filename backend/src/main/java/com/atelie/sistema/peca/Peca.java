@@ -130,6 +130,13 @@ public class Peca {
         enviarParaCostura();
     }
 
+    public void atualizarDadosDoCatalogo(String descricao, BigDecimal valorBase, String tamanho, String cor) {
+        this.descricao = descricao;
+        this.valorBase = valorBase;
+        this.tamanho = tamanho;
+        this.cor = cor;
+    }
+
     // AUDITORIA
 
     @PrePersist

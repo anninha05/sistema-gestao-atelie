@@ -40,6 +40,11 @@ public class PecaController {
         return ResponseEntity.ok(pecaService.buscarPorId(id));
     }
 
+    @PatchMapping("/{id}")
+    public ResponseEntity<PecaResponseDTO> atualizar(@PathVariable UUID id, @RequestBody PecaRequestDTO dto) {
+        return ResponseEntity.ok(pecaService.atualizar(id, dto));
+    }
+
     @PatchMapping("/{id}/costura")
     public ResponseEntity<PecaResponseDTO> costura(@PathVariable UUID id) {
         return ResponseEntity.ok(pecaService.enviarParaCostura(id));

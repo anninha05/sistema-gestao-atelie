@@ -2,6 +2,8 @@ package com.atelie.sistema.cliente;
 
 import com.atelie.sistema.cliente.dto.ClienteRequestDTO;
 import com.atelie.sistema.cliente.dto.ClienteResponseDTO;
+import com.atelie.sistema.ordemservico.OrdemServicoService;
+import com.atelie.sistema.ordemservico.dto.OrdemServicoResponseDTO;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,9 +16,11 @@ import java.util.UUID;
 public class ClienteController {
 
     private final ClienteService clienteService;
+    private final OrdemServicoService ordemServicoService;
 
-    public ClienteController(ClienteService clienteService) {
+    public ClienteController(ClienteService clienteService, OrdemServicoService ordemServicoService) {
         this.clienteService = clienteService;
+        this.ordemServicoService = ordemServicoService;
     }
 
     @PostMapping
@@ -33,5 +37,15 @@ public class ClienteController {
     @GetMapping("/{id}")
     public ResponseEntity<ClienteResponseDTO> buscarPorId(@PathVariable UUID id) {
         return ResponseEntity.ok(clienteService.buscarPorId(id));
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<ClienteResponseDTO> atualizar(@PathVariable UUID id, @RequestBody ClienteRequestDTO dto) {
+        return ResponseEntity.ok(clienteService.atualizar(id, dto));
+    }
+
+    @GetMapping("/{id}/ordens-servico")
+    public ResponseEntity<List<OrdemServicoResponseDTO>> historico(@PathVariable UUID id) {
+        return ResponseEntity.ok(ordemServicoService.listarPorCliente(id));
     }
 }

@@ -22,31 +22,10 @@ public class ClienteService {
 
     @Transactional
     public ClienteResponseDTO cadastrarCliente(ClienteRequestDTO dto) {
-        if (dto.nome() == null || dto.nome().isBlank() || dto.nome().length() > 255) {
-            throw new RegraNegocioException("Informe um nome válido.");
-        }
-        if (dto.telefone() == null || dto.telefone().length() > 20
-                || !dto.telefone().strip().matches("(?:\\+55\\s*)?(?:[1-9][0-9]|\\([1-9][0-9]\\))\\s*[0-9]{4,5}-?[0-9]{4}")) {
-            throw new RegraNegocioException("Informe um telefone com DDD e 10 ou 11 dígitos, como (22) 99999-9999.");
-        }
-        String telefone = dto.telefone().strip().replaceFirst("^\\+55\\s*", "")
-                .replaceAll("[()\\s-]", "");
-        String email = dto.email() == null ? null : dto.email().strip();
-        if (!Email.valido(email) || email.length() > 100) {
-            throw new RegraNegocioException("Informe um e-mail válido com até 100 caracteres.");
-        }
-        if (dto.cpf() == null || !dto.cpf().matches("[0-9]{11}|[0-9]{3}\\.[0-9]{3}\\.[0-9]{3}-[0-9]{2}")) {
-            throw new RegraNegocioException("Informe um CPF válido.");
-        }
-        String cpf = dto.cpf().replace(".", "").replace("-", "");
-        if (cpf.chars().allMatch(digito -> digito == cpf.charAt(0))
-                || digitoVerificador(cpf, 9) != cpf.charAt(9) - '0'
-                || digitoVerificador(cpf, 10) != cpf.charAt(10) - '0') {
-            throw new RegraNegocioException("Informe um CPF válido.");
-        }
-        if (clienteRepository.existsByCpf(cpf)) {
-            throw new RegraNegocioException("Já existe um cliente cadastrado com este CPF.");
-        }
+        validar(dto, null);
+        String telefone = normalizarTelefone(dto.telefone());
+        String email = dto.email().strip();
+        String cpf = normalizarCpf(dto.cpf());
 
         Cliente novoCliente = new Cliente(
                 dto.nome(),
@@ -57,6 +36,35 @@ public class ClienteService {
         Cliente clienteSalvo = clienteRepository.save(novoCliente);
 
         return toResponseDTO(clienteSalvo);
+    }
+
+    private void validar(ClienteRequestDTO dto, UUID id) {
+        if (dto.nome() == null || dto.nome().isBlank() || dto.nome().length() > 255)
+            throw new RegraNegocioException("Informe um nome válido.");
+        if (dto.telefone() == null || dto.telefone().length() > 20
+                || !dto.telefone().strip().matches("(?:\\+55\\s*)?(?:[1-9][0-9]|\\([1-9][0-9]\\))\\s*[0-9]{4,5}-?[0-9]{4}"))
+            throw new RegraNegocioException("Informe um telefone com DDD e 10 ou 11 dígitos.");
+        String email = dto.email() == null ? null : dto.email().strip();
+        if (!Email.valido(email) || email.length() > 100)
+            throw new RegraNegocioException("Informe um e-mail válido com até 100 caracteres.");
+        String cpf = normalizarCpf(dto.cpf());
+        if (id == null ? clienteRepository.existsByCpf(cpf) : clienteRepository.existsByCpfAndIdNot(cpf, id))
+            throw new RegraNegocioException("Já existe um cliente cadastrado com este CPF.");
+    }
+
+    private String normalizarTelefone(String telefone) {
+        return telefone.strip().replaceFirst("^\\+55\\s*", "").replaceAll("[()\\s-]", "");
+    }
+
+    private String normalizarCpf(String entrada) {
+        if (entrada == null || !entrada.matches("[0-9]{11}|[0-9]{3}\\.[0-9]{3}\\.[0-9]{3}-[0-9]{2}"))
+            throw new RegraNegocioException("Informe um CPF válido.");
+        String cpf = entrada.replace(".", "").replace("-", "");
+        if (cpf.chars().allMatch(digito -> digito == cpf.charAt(0))
+                || digitoVerificador(cpf, 9) != cpf.charAt(9) - '0'
+                || digitoVerificador(cpf, 10) != cpf.charAt(10) - '0')
+            throw new RegraNegocioException("Informe um CPF válido.");
+        return cpf;
     }
 
     private static int digitoVerificador(String cpf, int quantidade) {
@@ -76,6 +84,14 @@ public class ClienteService {
 
     public ClienteResponseDTO buscarPorId(UUID id) {
         return toResponseDTO(buscarEntidadePorId(id));
+    }
+
+    @Transactional
+    public ClienteResponseDTO atualizar(UUID id, ClienteRequestDTO dto) {
+        Cliente cliente = buscarEntidadePorId(id);
+        validar(dto, id);
+        cliente.atualizarContatos(dto.nome().strip(), normalizarTelefone(dto.telefone()), dto.email().strip(), normalizarCpf(dto.cpf()));
+        return toResponseDTO(cliente);
     }
 
     public Cliente buscarEntidadePorId(UUID id) {
