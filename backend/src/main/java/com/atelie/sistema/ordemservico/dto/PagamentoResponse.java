@@ -14,6 +14,6 @@ public record PagamentoResponse(
         StatusFinanceiro statusFinanceiro,
         List<Movimento> recebimentos) {
 
-    public record Movimento(BigDecimal valor, LocalDate data, MetodoPagamento metodo, boolean sinal) {
+    public record Movimento(Long id, BigDecimal valor, LocalDate data, MetodoPagamento metodo, boolean sinal) {
     }
 }

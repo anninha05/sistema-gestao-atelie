@@ -362,7 +362,7 @@ public class OrdemServicoService {
                 pagamento.getSaldoDevedor(),
                 pagamento.getStatusFinanceiro(),
                 pagamento.getRecebimentos().stream()
-                        .map(r -> new PagamentoResponse.Movimento(r.getValor(), r.getData(), r.getMetodo(), r.isSinal()))
+                        .map(r -> new PagamentoResponse.Movimento(r.getId(), r.getValor(), r.getData(), r.getMetodo(), r.isSinal()))
                         .toList());
     }
 
