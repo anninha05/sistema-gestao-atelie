@@ -16,12 +16,13 @@ const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL
 
 export default function PecasPage({ titulo }) {
   const { usuario } = useContext(ContextoDeAutenticacao);
+  const ehProducao = usuario.perfil === 'ROLE_PRODUCAO';
   const [tipo, setTipo] = useState('');
   const [estado, setEstado] = useState('');
 
   return (
     <Catalogo titulo={titulo} descricao="Consulte e cadastre as peças do ateliê."
-      caminho="/pecas" rotuloCadastro="Nova peça" rotuloBusca="Buscar por descrição ou etiqueta"
+      caminho={ehProducao ? '/pecas/producao' : '/pecas'} rotuloCadastro="Nova peça" rotuloBusca="Buscar por descrição ou etiqueta"
       cadastroDesabilitado={usuario.perfil === 'ROLE_PRODUCAO'}
       correspondeABusca={(peca, busca) => {
         const termo = busca.toLocaleLowerCase('pt-BR');
@@ -77,7 +78,7 @@ export default function PecasPage({ titulo }) {
         ['Estado', estados[peca.status] || peca.status],
         ['Tamanho', peca.tamanho],
         ['Cor', peca.cor],
-        ['Valor base', peca.valorBase == null ? null : moeda.format(peca.valorBase)],
+        ...(!ehProducao ? [['Valor base', peca.valorBase == null ? null : moeda.format(peca.valorBase)]] : []),
       ]}
     />
   );

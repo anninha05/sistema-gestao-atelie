@@ -34,6 +34,7 @@ function validarOrdem(formulario) {
 
 function CamposDaOrdem({ clientes, pecas }) {
   const [tipo, setTipo] = useState('LOCACAO');
+  const [pecasSelecionadas, setPecasSelecionadas] = useState([]);
   const [disponibilidade, setDisponibilidade] = useState('');
   const [consultando, setConsultando] = useState(false);
   const pecasDoTipo = pecas.filter((peca) => peca.tipo === tipo);
@@ -83,17 +84,26 @@ function CamposDaOrdem({ clientes, pecas }) {
         pesquisar="Buscar por nome ou CPF"
         opcoes={clientes.map((cliente) => [cliente.id, cliente.nome + ' · ' + cliente.cpf])} />
       <Selecao rotulo="Tipo" nome="tipoFluxo" valor={tipo} aoSelecionar={(valor) => {
-        setTipo(valor); setDisponibilidade('');
+        setTipo(valor); setDisponibilidade(''); setPecasSelecionadas([]);
       }} opcoes={Object.entries(tipos)} />
       <div className="ordem-selecao-pecas">
         <Selecao key={tipo} rotulo="Peças da ordem" nome="pecas" multipla
-          aoSelecionar={() => setDisponibilidade('')}
+          aoSelecionar={(selecionadas) => { setDisponibilidade(''); setPecasSelecionadas(selecionadas); }}
           pesquisar="Buscar por descrição ou etiqueta" textoInicial="Selecione as peças"
           opcoes={pecasDoTipo.map((peca) => [
             peca.id,
             peca.descricao + ' · ' + moeda.format(peca.valorBase ?? 0) + ' · ' + (peca.codigoEtiqueta ?? ''),
           ])} />
       </div>
+      {pecasSelecionadas.map((id) => {
+        const peca = pecas.find((item) => item.id === id);
+        if (!peca) return null;
+        return <fieldset className="ordem-detalhe-peca" key={id}>
+          <legend>{peca.descricao} · {peca.codigoEtiqueta}</legend>
+          <label>Medidas desta peça<textarea name={'medidas-' + id} rows={2} maxLength={10000} /></label>
+          <label>Instruções de costura desta peça<textarea name={'instrucoes-' + id} rows={2} maxLength={10000} /></label>
+        </fieldset>;
+      })}
       {tipo === 'LOCACAO' && (
         <>
           <label>Início da locação<input name="inicioLocacao" type="datetime-local" required onChange={() => setDisponibilidade('')} /></label>
@@ -112,8 +122,6 @@ function CamposDaOrdem({ clientes, pecas }) {
       <label>Data de entrega<input name="dataEntrega" type="datetime-local" /></label>
       <label>Desconto (%)<input name="descontoPercentual" type="number" min="0" max="99.99"
         step="0.01" inputMode="decimal" placeholder="0" /></label>
-      <label>Medidas<textarea name="medidas" rows={3} /></label>
-      <label>Instruções de costura<textarea name="instrucoesCostura" rows={3} /></label>
     </>
   );
 }
@@ -168,8 +176,13 @@ export default function OrdensServicoPage({ titulo }) {
           dataProva: formulario.get('dataProva') || null,
           dataEvento: formulario.get('dataEvento') || null,
           dataEntrega: formulario.get('dataEntrega') || null,
-          medidas: formulario.get('medidas').trim() || null,
-          instrucoesCostura: formulario.get('instrucoesCostura').trim() || null,
+          medidas: null,
+          instrucoesCostura: null,
+          detalhesItens: formulario.getAll('pecas').map((pecaId) => ({
+            pecaId,
+            medidas: formulario.get('medidas-' + pecaId)?.trim() || null,
+            instrucoesCostura: formulario.get('instrucoes-' + pecaId)?.trim() || null,
+          })),
         })}
         tituloDoItem={(ordem) => ordem.clienteNome}
         acoesDoItem={(ordem, aoAtualizar) => <>

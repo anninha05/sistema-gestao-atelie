@@ -24,10 +24,10 @@ export default function FilaCosturaPage({ titulo }) {
   useEffect(() => {
     const controlador = new AbortController();
     const configuracao = { signal: controlador.signal };
-    Promise.all([api.get('/ordens-servico', configuracao), api.get('/pecas', configuracao)])
+    Promise.all([api.get('/ordens-servico/producao', configuracao), api.get('/pecas/producao', configuracao)])
       .then(([ordens, pecas]) => setFila({
         ordens: ordens.data,
-        nomesDasPecas: new Map(pecas.data.map((peca) => [peca.id, peca.descricao])),
+        nomesDasPecas: new Map(pecas.data.map((peca) => [peca.id, peca.descricao + ' · ' + peca.codigoEtiqueta])),
       }))
       .catch(() => {
         if (!controlador.signal.aborted) setErroAoCarregar(true);
@@ -86,12 +86,14 @@ export default function FilaCosturaPage({ titulo }) {
                 <li key={ordem.id} aria-busy={atualizando === ordem.id}>
                   <h3>{ordem.clienteNome}</h3>
                   <dl>
-                    <div><dt>Peças</dt><dd>{ordem.itens?.map((item) =>
+                    <div><dt>Peças</dt><dd>{ordem.pecas?.map((item) =>
                       fila.nomesDasPecas.get(item.pecaId) ?? item.pecaId).join(', ') || '—'}</dd></div>
                     <div><dt>Prazo</dt><dd>{prazo ? dataHora.format(new Date(prazo)) : '—'}</dd></div>
                     <div><dt>Prova</dt><dd>{ordem.dataProva ? dataHora.format(new Date(ordem.dataProva)) : '—'}</dd></div>
-                    <div><dt>Medidas</dt><dd>{ordem.medidas || '—'}</dd></div>
-                    <div><dt>Instruções de costura</dt><dd>{ordem.instrucoesCostura || '—'}</dd></div>
+                    {ordem.pecas?.map((item) => <div key={item.pecaId}>
+                      <dt>{fila.nomesDasPecas.get(item.pecaId) ?? 'Peça'} · medidas</dt><dd>{item.medidas || '—'}</dd>
+                      <dt>Instruções de costura</dt><dd>{item.instrucoesCostura || '—'}</dd>
+                    </div>)}
                   </dl>
                   <div className="fila-acoes">
                     {etapa.acoes.filter(([acao]) => ordem.statusAtual !== 'PROVA' || acao !== 'passadoria')
