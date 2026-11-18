@@ -9,6 +9,7 @@ import com.atelie.sistema.ordemservico.dto.RegistrarPagamentoRequest;
 import com.atelie.sistema.ordemservico.dto.ReagendarOrdemServicoRequest;
 import com.atelie.sistema.ordemservico.dto.OrdemProducaoResponse;
 import com.atelie.sistema.ordemservico.dto.ItemProducaoRequest;
+import com.atelie.sistema.ordemservico.dto.CompromissoResponse;
 import com.atelie.sistema.ordemservico.state.StatusOrdemServico;
 import com.atelie.sistema.shared.exception.RecursoNaoEncontradoException;
 import com.atelie.sistema.peca.Peca;
@@ -177,6 +178,41 @@ public class OrdemServicoService {
                 os.getItens().stream().map(item -> new OrdemProducaoResponse.Item(item.pecaId(),
                         item.medidas(), item.instrucoesCostura())).toList());
     }
+
+    @Transactional(readOnly = true)
+    public List<CompromissoResponse> compromissosDoDia(java.time.LocalDate data) {
+        if (data == null) throw new RegraNegocioException("Informe uma data válida para a agenda.");
+        return ordemServicoRepository.findAll().stream()
+                .filter(os -> os.getStatusAtual() != StatusOrdemServico.CANCELADA)
+                .flatMap(os -> {
+                    var compromissos = new java.util.ArrayList<CompromissoResponse>();
+                    var status = os.getStatusAtual();
+                    boolean emProducao = !List.of(StatusOrdemServico.RETIRADA, StatusOrdemServico.ENTREGUE,
+                            StatusOrdemServico.DEVOLVIDA, StatusOrdemServico.CANCELADA).contains(status);
+                    if (emProducao && os.getDataProva() != null && os.getDataProva().toLocalDate().equals(data))
+                        compromissos.add(compromisso(os, "Prova", os.getDataProva()));
+                    if (os.getTipoFluxo() == TipoFluxo.LOCACAO) {
+                        if (status == StatusOrdemServico.CONCLUIDO && os.getInicioLocacao() != null
+                                && os.getInicioLocacao().toLocalDate().equals(data))
+                            compromissos.add(compromisso(os, "Retirada", os.getInicioLocacao()));
+                        if (status == StatusOrdemServico.RETIRADA && os.getFimLocacao() != null
+                                && os.getFimLocacao().toLocalDate().equals(data))
+                            compromissos.add(compromisso(os, "Devolução", os.getFimLocacao()));
+                    } else if (status != StatusOrdemServico.ENTREGUE && os.getDataEntrega() != null
+                            && os.getDataEntrega().toLocalDate().equals(data)) {
+                        compromissos.add(compromisso(os, "Entrega", os.getDataEntrega()));
+                    }
+                    return compromissos.stream();
+                })
+                .sorted(java.util.Comparator.comparing(CompromissoResponse::dataHora))
+                .toList();
+    }
+
+    private CompromissoResponse compromisso(OrdemServico os, String tipo, java.time.LocalDateTime dataHora) {
+        return new CompromissoResponse(os.getId(), os.getCliente().getNome(), os.getTipoFluxo(), tipo, dataHora, os.getStatusAtual());
+    }
+
+    @Transactional(readOnly = true)
     public OrdemServicoResponseDTO buscarPorId(UUID id) {
         return toResponseDTO(buscarEntidadePorId(id));
     }
