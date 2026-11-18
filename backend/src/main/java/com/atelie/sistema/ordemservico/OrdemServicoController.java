@@ -6,6 +6,9 @@ import com.atelie.sistema.ordemservico.dto.OrdemServicoResponseDTO;
 import com.atelie.sistema.ordemservico.dto.PagamentoResponse;
 import com.atelie.sistema.ordemservico.dto.ReagendarOrdemServicoRequest;
 import com.atelie.sistema.ordemservico.dto.RegistrarPagamentoRequest;
+import com.atelie.sistema.precificacao.AprovacaoPrecoService;
+import com.atelie.sistema.precificacao.dto.AprovacaoPrecoResponse;
+import com.atelie.sistema.precificacao.dto.AprovarPrecoRequest;
 import com.atelie.sistema.usuario.Perfil;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -21,9 +24,11 @@ import org.springframework.web.bind.annotation.*;
 public class OrdemServicoController {
 
     private final OrdemServicoService ordemServicoService;
+    private final AprovacaoPrecoService aprovacaoPrecoService;
 
-    public OrdemServicoController(OrdemServicoService ordemServicoService) {
+    public OrdemServicoController(OrdemServicoService ordemServicoService, AprovacaoPrecoService aprovacaoPrecoService) {
         this.ordemServicoService = ordemServicoService;
+        this.aprovacaoPrecoService = aprovacaoPrecoService;
     }
 
     @PostMapping
@@ -59,6 +64,12 @@ public class OrdemServicoController {
     public OrdemServicoResponseDTO reagendar(@PathVariable UUID id,
             @RequestBody ReagendarOrdemServicoRequest request, Authentication usuario) {
         return ordemServicoService.reagendar(id, request).paraPerfil(Perfil.de(usuario));
+    }
+
+    @PostMapping("/{id}/aprovar-preco")
+    public AprovacaoPrecoResponse aprovarPreco(@PathVariable UUID id, @RequestBody AprovarPrecoRequest request,
+            Authentication usuario) {
+        return aprovacaoPrecoService.aprovar(id, request, usuario.getName());
     }
 
     @PatchMapping("/{id}/confeccao")

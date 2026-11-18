@@ -256,6 +256,78 @@ class SistemaApplicationTests {
     }
 
     @Test
+    void aprovaSugestaoComAtualizacaoConsistenteDoPagamentoEAuditoria() throws Exception {
+        var cliente = clientes.cadastrarCliente(new ClienteRequestDTO("Cliente aprovação", "22999999999",
+                "aprovacao-" + UUID.randomUUID() + "@email.com", gerarCpfParaTeste()));
+        var peca = pecas.cadastrarPeca(new PecaRequestDTO("Peça aprovação", TipoFluxo.LOCACAO,
+                new BigDecimal("150.00"), "M", "Rosa"));
+        var ordem = ordens.abrirOrdemServico(new OrdemServicoRequestDTO(cliente.id(), TipoFluxo.LOCACAO,
+                List.of(peca.id()), null, LocalDateTime.now().plusDays(15), LocalDateTime.now().plusDays(17),
+                null, null, null, null, LocalDateTime.now().plusDays(16), null));
+        ordens.registrarPagamento(ordem.id(), new RegistrarPagamentoRequest(new BigDecimal("40.00"),
+                LocalDate.now(), MetodoPagamento.PIX));
+
+        var admin = autenticar(Perfil.ROLE_ADMIN);
+        var token = obterToken(admin);
+        mvc.perform(put("/precificacao/politica").session(admin).header("X-CSRF-TOKEN", token)
+                .contentType("application/json")
+                .content("""
+                        {"ganhoProporcional":0,"ganhoIntegral":0,"ganhoDerivativo":0,
+                         "ajusteMinimo":-0.05,"ajusteMaximo":0.05,
+                         "descontoFidelidade":null,"quantidadeOsFidelidade":null}
+                        """))
+                .andExpect(status().isOk());
+        var criar = "{\"ordemServicoId\":\"" + ordem.id() + "\",\"pisoMinimo\":180.00}";
+        token = obterToken(admin);
+        var criada = mvc.perform(post("/precificacao/sugestoes").session(admin).header("X-CSRF-TOKEN", token)
+                .contentType("application/json").content(criar))
+                .andExpect(status().isOk()).andReturn();
+        long sugestaoId = json.readTree(criada.getResponse().getContentAsString()).get("id").asLong();
+
+        token = obterToken(admin);
+        mvc.perform(post("/ordens-servico/" + ordem.id() + "/aprovar-preco").session(admin)
+                .header("X-CSRF-TOKEN", token).contentType("application/json")
+                .content("{\"sugestaoId\":" + sugestaoId + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valorAnterior").value(150.00))
+                .andExpect(jsonPath("$.valorAprovado").value(180.00))
+                .andExpect(jsonPath("$.valorRecebido").value(40.00))
+                .andExpect(jsonPath("$.responsavelNome").value("Teste retirada"));
+        assertEquals(new BigDecimal("180.00"), ordens.buscarPorId(ordem.id()).valorTotal());
+        mvc.perform(get("/ordens-servico/" + ordem.id() + "/pagamentos").session(admin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.valorTotal").value(180.00))
+                .andExpect(jsonPath("$.valorPago").value(40.00)).andExpect(jsonPath("$.saldoDevedor").value(140.00));
+        assertEquals(1, jdbc.queryForObject("select count(*) from precificacao_aprovacoes where sugestao_id = ?",
+                Integer.class, sugestaoId));
+
+        token = obterToken(admin);
+        mvc.perform(post("/ordens-servico/" + ordem.id() + "/aprovar-preco").session(admin)
+                .header("X-CSRF-TOKEN", token).contentType("application/json")
+                .content("{\"sugestaoId\":" + sugestaoId + "}"))
+                .andExpect(status().isBadRequest());
+        assertEquals(1, jdbc.queryForObject("select count(*) from precificacao_aprovacoes where sugestao_id = ?",
+                Integer.class, sugestaoId));
+
+        var outraPeca = pecas.cadastrarPeca(new PecaRequestDTO("Peça outra ordem", TipoFluxo.LOCACAO,
+                new BigDecimal("125.00"), "M", "Azul"));
+        var outra = ordens.abrirOrdemServico(new OrdemServicoRequestDTO(cliente.id(), TipoFluxo.LOCACAO,
+                List.of(outraPeca.id()), null, LocalDateTime.now().plusDays(20), LocalDateTime.now().plusDays(22),
+                null, null, null, null, LocalDateTime.now().plusDays(21), null));
+        token = obterToken(admin);
+        mvc.perform(post("/ordens-servico/" + outra.id() + "/aprovar-preco").session(admin)
+                .header("X-CSRF-TOKEN", token).contentType("application/json")
+                .content("{\"sugestaoId\":" + sugestaoId + "}"))
+                .andExpect(status().isBadRequest());
+        assertEquals(new BigDecimal("125.00"), ordens.buscarPorId(outra.id()).valorTotal());
+
+        var producao = autenticar(Perfil.ROLE_PRODUCAO);
+        mvc.perform(post("/ordens-servico/" + outra.id() + "/aprovar-preco").session(producao)
+                .header("X-CSRF-TOKEN", obterToken(producao)).contentType("application/json")
+                .content("{\"sugestaoId\":" + sugestaoId + "}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void devePersistirReservaFluxoERecebimento() throws Exception {
         var cpf = gerarCpfParaTeste();
         var cliente = clientes.cadastrarCliente(new ClienteRequestDTO("Cliente teste", "22999999999", "teste@email.com", cpf));
