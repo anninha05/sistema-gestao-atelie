@@ -1,6 +1,6 @@
 import { useContext, useState } from 'react';
 import { ContextoDeAutenticacao } from '../auth/AuthContext.jsx';
-import { requisitarComCsrf } from '../../shared/api.js';
+import { requisitarComCsrf, baixarPdf } from '../../shared/api.js';
 import { Aviso, Modal } from '../../shared/Interface.jsx';
 
 const acoesDeProducao = {
@@ -24,6 +24,8 @@ export default function AcoesDaOrdem({ ordem, aoAtualizar }) {
   const atendimento = ['ROLE_ADMIN', 'ROLE_ATENDENTE'].includes(usuario.perfil);
   const podeReagendar = atendimento && !["RETIRADA", "ENTREGUE", "DEVOLVIDA", "CANCELADA"].includes(ordem.statusAtual);
   const [reagendamentoAberto, setReagendamentoAberto] = useState(false);
+  const [erroDocumento, setErroDocumento] = useState('');
+  const [gerandoDocumento, setGerandoDocumento] = useState(false);
 
   if (atendimento && ordem.statusAtual === 'CONCLUIDO') {
     acoes.push(['retirar', ordem.tipoFluxo === 'LOCACAO' ? 'Registrar retirada' : 'Registrar entrega']);
@@ -56,6 +58,13 @@ export default function AcoesDaOrdem({ ordem, aoAtualizar }) {
     <div>
       {confirmacao && <Aviso tipo="sucesso">{confirmacao}</Aviso>}
       <div className="fila-acoes">
+        {atendimento && ordem.tipoFluxo === 'LOCACAO' && <button type="button" className="botao-secundario"
+          disabled={gerandoDocumento} onClick={async () => {
+            setGerandoDocumento(true); setErroDocumento('');
+            try { await baixarPdf('/ordens-servico/' + ordem.id + '/contrato.pdf', 'contrato-' + ordem.id + '.pdf'); }
+            catch { setErroDocumento('Não foi possível gerar o contrato.'); }
+            finally { setGerandoDocumento(false); }
+          }}>{gerandoDocumento ? 'Gerando contrato…' : 'Baixar contrato PDF'}</button>}
         {podeReagendar && <button type="button" className="botao-secundario"
           onClick={() => { setErro(""); setReagendamentoAberto(true); }}>Reagendar</button>}
         {acoes.map(([acao, rotulo]) => (
@@ -68,35 +77,36 @@ export default function AcoesDaOrdem({ ordem, aoAtualizar }) {
             }}>{rotulo}</button>
         ))}
       </div>
+      {erroDocumento && <Aviso>{erroDocumento}</Aviso>}
       {reagendamentoAberto && <Modal titulo="Reagendar ordem" ocupado={salvando} aoFechar={() => setReagendamentoAberto(false)}>
         <form className="catalogo-form" onSubmit={async (evento) => {
           evento.preventDefault();
           const formulario = new FormData(evento.currentTarget);
-          const inicio = formulario.get("inicioLocacao");
-          const fim = formulario.get("fimLocacao");
-          if (ordem.tipoFluxo === "LOCACAO" && (!inicio || !fim || fim <= inicio)) {
-            setErro("Informe um período de locação válido.");
+          const inicio = formulario.get('inicioLocacao');
+          const fim = formulario.get('fimLocacao');
+          if (ordem.tipoFluxo === 'LOCACAO' && (!inicio || !fim || fim <= inicio)) {
+            setErro('Informe um período de locação válido.');
             return;
           }
           setSalvando(true);
-          setErro("");
+          setErro('');
           try {
-            const { data } = await requisitarComCsrf("patch", "/ordens-servico/" + ordem.id + "/reagendar", {
+            const { data } = await requisitarComCsrf('patch', '/ordens-servico/' + ordem.id + '/reagendar', {
               inicioLocacao: inicio || null, fimLocacao: fim || null,
-              dataProva: formulario.get("dataProva") || null,
-              dataEvento: formulario.get("dataEvento") || null,
-              dataEntrega: formulario.get("dataEntrega") || null,
+              dataProva: formulario.get('dataProva') || null,
+              dataEvento: formulario.get('dataEvento') || null,
+              dataEntrega: formulario.get('dataEntrega') || null,
             });
             aoAtualizar(data);
             setReagendamentoAberto(false);
-            setConfirmacao("Datas atualizadas. Se já houver contrato emitido, gere uma nova via.");
+            setConfirmacao('Datas atualizadas. Se já houver contrato emitido, gere uma nova via.');
           } catch (falha) {
-            setErro(falha.response?.data?.mensagem || "Não foi possível reagendar a ordem.");
+            setErro(falha.response?.data?.mensagem || 'Não foi possível reagendar a ordem.');
           } finally { setSalvando(false); }
         }} noValidate>
           {erro && <Aviso>{erro}</Aviso>}
           <fieldset disabled={salvando}>
-            {ordem.tipoFluxo === "LOCACAO" && <>
+            {ordem.tipoFluxo === 'LOCACAO' && <>
               <label>Início da locação<input name="inicioLocacao" type="datetime-local" defaultValue={ordem.inicioLocacao?.slice(0, 16)} required /></label>
               <label>Fim da locação<input name="fimLocacao" type="datetime-local" defaultValue={ordem.fimLocacao?.slice(0, 16)} required /></label>
             </>}

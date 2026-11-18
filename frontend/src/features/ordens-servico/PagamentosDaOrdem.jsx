@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, requisitarComCsrf } from '../../shared/api.js';
+import { api, requisitarComCsrf, baixarPdf } from '../../shared/api.js';
 import { Aviso, Modal, Selecao, validarCampos } from '../../shared/Interface.jsx';
 
 const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -14,6 +14,7 @@ function ConteudoPagamentos({ ordem, aoFechar }) {
   const [confirmacao, setConfirmacao] = useState('');
   const [precisaAtualizar, setPrecisaAtualizar] = useState(false);
   const [consultando, setConsultando] = useState(true);
+  const [baixandoRecibo, setBaixandoRecibo] = useState(null);
   const caminho = '/ordens-servico/' + ordem.id + '/pagamentos';
 
   useEffect(() => {
@@ -79,9 +80,15 @@ function ConteudoPagamentos({ ordem, aoFechar }) {
         </dl>
         <h3>Histórico de recebimentos</h3>
         {pagamento.recebimentos.length === 0 && <p>Nenhum recebimento registrado.</p>}
-        <ul>{pagamento.recebimentos.map((item, indice) => (
-          <li key={indice}>{item.data.split('-').reverse().join('/')} · {moeda.format(item.valor)} · {metodos.find(([valor]) => valor === item.metodo)?.[1]}
-            {item.sinal ? ' · Sinal' : ''}</li>
+        <ul>{pagamento.recebimentos.map((item) => (
+          <li key={item.id}>{item.data.split('-').reverse().join('/')} · {moeda.format(item.valor)} · {metodos.find(([valor]) => valor === item.metodo)?.[1]}
+            {item.sinal ? ' · Sinal' : ''} <button type="button" className="botao-secundario"
+              disabled={baixandoRecibo === item.id} onClick={async () => {
+                setBaixandoRecibo(item.id); setErro('');
+                try { await baixarPdf(caminho + '/' + item.id + '/recibo.pdf', 'recibo-' + item.id + '.pdf'); }
+                catch { setErro('Não foi possível gerar o recibo.'); }
+                finally { setBaixandoRecibo(null); }
+              }}>{baixandoRecibo === item.id ? 'Gerando…' : 'Recibo PDF'}</button></li>
         ))}</ul>
         {pagamento.saldoDevedor > 0 && (
           <form className="catalogo-form" noValidate onSubmit={salvar}>
