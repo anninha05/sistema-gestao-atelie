@@ -35,13 +35,16 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/csrf", "/auth/login").permitAll()
                         .requestMatchers("/usuarios/**", "/financeiro/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/dashboard/**").hasAnyRole("ADMIN", "ATENDENTE")
+                        .requestMatchers(HttpMethod.GET, "/ordens-servico/producao", "/pecas/producao").hasAnyRole("ADMIN", "PRODUCAO")
                         .requestMatchers("/ordens-servico/*/pagamentos/**").hasAnyRole("ADMIN", "ATENDENTE")
                         .requestMatchers(HttpMethod.PATCH, "/pecas/*/devolver").hasAnyRole("ADMIN", "ATENDENTE", "PRODUCAO")
+                        .requestMatchers(HttpMethod.PATCH, "/clientes/*", "/pecas/*").hasAnyRole("ADMIN", "ATENDENTE")
                         .requestMatchers(HttpMethod.PATCH, "/ordens-servico/*/confeccao",
                                 "/ordens-servico/*/prova", "/ordens-servico/*/passadoria",
                                 "/ordens-servico/*/concluir", "/pecas/*/costura",
                                 "/pecas/*/lavagem").hasAnyRole("ADMIN", "PRODUCAO")
-                        .requestMatchers(HttpMethod.GET, "/ordens-servico/**", "/pecas/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/ordens-servico/**", "/pecas/**").hasAnyRole("ADMIN", "ATENDENTE")
                         .requestMatchers("/ordens-servico/**", "/pecas/**", "/clientes/**")
                                 .hasAnyRole("ADMIN", "ATENDENTE")
                         .requestMatchers("/auth/me").authenticated()

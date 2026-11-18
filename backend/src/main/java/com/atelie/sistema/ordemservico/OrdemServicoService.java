@@ -7,6 +7,8 @@ import com.atelie.sistema.ordemservico.dto.OrdemServicoResponseDTO;
 import com.atelie.sistema.ordemservico.dto.PagamentoResponse;
 import com.atelie.sistema.ordemservico.dto.RegistrarPagamentoRequest;
 import com.atelie.sistema.ordemservico.dto.ReagendarOrdemServicoRequest;
+import com.atelie.sistema.ordemservico.dto.OrdemProducaoResponse;
+import com.atelie.sistema.ordemservico.dto.ItemProducaoRequest;
 import com.atelie.sistema.ordemservico.state.StatusOrdemServico;
 import com.atelie.sistema.shared.exception.RecursoNaoEncontradoException;
 import com.atelie.sistema.peca.Peca;
@@ -52,6 +54,7 @@ public class OrdemServicoService {
                 || !dto.inicioLocacao().isBefore(dto.fimLocacao()))) {
             throw new RegraNegocioException("Informe um período de locação válido.");
         }
+        var detalhes = validarDetalhesItens(dto);
         List<ItemOrdemServico> itens = dto.pecas().stream().sorted().map(id -> {
             Peca peca = pecaRepository.buscarParaReserva(id)
                     .orElseThrow(() -> new RecursoNaoEncontradoException("Peça não encontrada com id: " + id));
@@ -61,7 +64,10 @@ public class OrdemServicoService {
             if (locacao) {
                 validarDisponibilidade(peca, dto.inicioLocacao(), dto.fimLocacao());
             }
-            return new ItemOrdemServico(id, peca.getValorBase());
+            ItemProducaoRequest detalhe = detalhes.get(id);
+            return new ItemOrdemServico(id, peca.getValorBase(),
+                    detalhe == null ? dto.medidas() : detalhe.medidas(),
+                    detalhe == null ? dto.instrucoesCostura() : detalhe.instrucoesCostura());
         }).toList();
         BigDecimal subtotal = itens.stream().map(ItemOrdemServico::valorUnitario)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -91,6 +97,20 @@ public class OrdemServicoService {
 
         OrdemServico salva = ordemServicoRepository.save(os);
         return toResponseDTO(salva);
+    }
+
+    private java.util.Map<UUID, ItemProducaoRequest> validarDetalhesItens(OrdemServicoRequestDTO dto) {
+        if (dto.detalhesItens() == null || dto.detalhesItens().isEmpty()) return java.util.Map.of();
+        var detalhes = new java.util.HashMap<UUID, ItemProducaoRequest>();
+        for (ItemProducaoRequest detalhe : dto.detalhesItens()) {
+            if (detalhe == null || detalhe.pecaId() == null || !dto.pecas().contains(detalhe.pecaId())
+                    || detalhe.medidas() != null && detalhe.medidas().length() > 10000
+                    || detalhe.instrucoesCostura() != null && detalhe.instrucoesCostura().length() > 10000
+                    || detalhes.putIfAbsent(detalhe.pecaId(), detalhe) != null) {
+                throw new RegraNegocioException("Informe dados de produção válidos para cada peça selecionada.");
+            }
+        }
+        return detalhes;
     }
 
     @Transactional(readOnly = true)
@@ -132,6 +152,31 @@ public class OrdemServicoService {
     }
 
     @Transactional(readOnly = true)
+    public List<OrdemProducaoResponse> listarFilaProducao() {
+        return ordemServicoRepository.findAll().stream()
+                .filter(os -> !List.of(StatusOrdemServico.CANCELADA, StatusOrdemServico.ENTREGUE,
+                        StatusOrdemServico.DEVOLVIDA, StatusOrdemServico.RETIRADA).contains(os.getStatusAtual()))
+                .map(this::toOrdemProducaoResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public OrdemProducaoResponse buscarParaProducao(UUID id) {
+        OrdemServico os = buscarEntidadePorId(id);
+        if (List.of(StatusOrdemServico.CANCELADA, StatusOrdemServico.ENTREGUE,
+                StatusOrdemServico.DEVOLVIDA, StatusOrdemServico.RETIRADA).contains(os.getStatusAtual())) {
+            throw new RegraNegocioException("Esta ordem não está mais na fila de produção.");
+        }
+        return toOrdemProducaoResponse(os);
+    }
+
+    private OrdemProducaoResponse toOrdemProducaoResponse(OrdemServico os) {
+        return new OrdemProducaoResponse(os.getId(), os.getCliente().getNome(), os.getTipoFluxo(),
+                os.getStatusAtual(), os.getDataEntrega(), os.getInicioLocacao(), os.getDataProva(),
+                os.getDataEvento(), os.getMedidas(), os.getInstrucoesCostura(),
+                os.getItens().stream().map(item -> new OrdemProducaoResponse.Item(item.pecaId(),
+                        item.medidas(), item.instrucoesCostura())).toList());
+    }
     public OrdemServicoResponseDTO buscarPorId(UUID id) {
         return toResponseDTO(buscarEntidadePorId(id));
     }

@@ -3,12 +3,14 @@ package com.atelie.sistema.peca;
 import com.atelie.sistema.peca.dto.PecaRequestDTO;
 import com.atelie.sistema.peca.dto.LiberacaoPecaRequestDTO;
 import com.atelie.sistema.peca.dto.PecaResponseDTO;
+import com.atelie.sistema.peca.dto.PecaProducaoResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.core.Authentication;
 
 @RestController
 @RequestMapping("/pecas")
@@ -30,6 +32,11 @@ public class PecaController {
         return ResponseEntity.ok(pecaService.listarTodas());
     }
 
+    @GetMapping("/producao")
+    public ResponseEntity<List<PecaProducaoResponse>> listarParaProducao() {
+        return ResponseEntity.ok(pecaService.listarParaProducao());
+    }
+
     @GetMapping("/disponiveis")
     public ResponseEntity<List<PecaResponseDTO>> listarDisponiveis() {
         return ResponseEntity.ok(pecaService.listarDisponiveis());
@@ -46,18 +53,26 @@ public class PecaController {
     }
 
     @PatchMapping("/{id}/costura")
-    public ResponseEntity<PecaResponseDTO> costura(@PathVariable UUID id) {
-        return ResponseEntity.ok(pecaService.enviarParaCostura(id));
+    public ResponseEntity<?> costura(@PathVariable UUID id, Authentication usuario) {
+        pecaService.enviarParaCostura(id);
+        return ResponseEntity.ok(respostaAtualizada(id, usuario));
     }
 
     @PatchMapping("/{id}/lavagem")
-    public ResponseEntity<PecaResponseDTO> lavagem(@PathVariable UUID id) {
-        return ResponseEntity.ok(pecaService.enviarParaLavagem(id));
+    public ResponseEntity<?> lavagem(@PathVariable UUID id, Authentication usuario) {
+        pecaService.enviarParaLavagem(id);
+        return ResponseEntity.ok(respostaAtualizada(id, usuario));
     }
 
     @PatchMapping("/{id}/devolver")
-    public ResponseEntity<PecaResponseDTO> devolver(@PathVariable UUID id,
-            @RequestBody(required = false) LiberacaoPecaRequestDTO confirmacao) {
-        return ResponseEntity.ok(pecaService.devolverParaEstoque(id, confirmacao));
+    public ResponseEntity<?> devolver(@PathVariable UUID id,
+            @RequestBody(required = false) LiberacaoPecaRequestDTO confirmacao, Authentication usuario) {
+        pecaService.devolverParaEstoque(id, confirmacao);
+        return ResponseEntity.ok(respostaAtualizada(id, usuario));
+    }
+
+    private Object respostaAtualizada(UUID id, Authentication usuario) {
+        boolean producao = usuario.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_PRODUCAO"));
+        return producao ? pecaService.buscarParaProducao(id) : pecaService.buscarPorId(id);
     }
 }

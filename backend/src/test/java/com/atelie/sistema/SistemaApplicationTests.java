@@ -6,6 +6,7 @@ import com.atelie.sistema.ordemservico.MetodoPagamento;
 import com.atelie.sistema.ordemservico.OrdemServicoService;
 import com.atelie.sistema.ordemservico.dto.OrdemServicoRequestDTO;
 import com.atelie.sistema.ordemservico.dto.RegistrarPagamentoRequest;
+import com.atelie.sistema.ordemservico.dto.ItemProducaoRequest;
 import com.atelie.sistema.ordemservico.state.StatusOrdemServico;
 import com.atelie.sistema.peca.PecaService;
 import com.atelie.sistema.peca.TipoFluxo;
@@ -89,23 +90,46 @@ class SistemaApplicationTests {
         mvc.perform(get("/auth/me").session(autenticada))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.email").value(email))
                 .andExpect(jsonPath("$.senha").doesNotExist());
-        mvc.perform(get("/ordens-servico").session(autenticada)).andExpect(status().isOk());
+        mvc.perform(get("/ordens-servico").session(autenticada)).andExpect(status().isForbidden());
+        mvc.perform(get("/ordens-servico/producao").session(autenticada)).andExpect(status().isOk());
+        var clienteTeste = clientes.cadastrarCliente(new ClienteRequestDTO("Cliente produção", "22999999999",
+                "cliente.producao@email.com", gerarCpfParaTeste()));
+        var pecaTeste = pecas.cadastrarPeca(new PecaRequestDTO("Modelo produção", TipoFluxo.SOB_MEDIDA,
+                new BigDecimal("120.00"), "M", "Rosa"));
+        var testeOrdem = ordens.abrirOrdemServico(new OrdemServicoRequestDTO(clienteTeste.id(), TipoFluxo.SOB_MEDIDA,
+                List.of(pecaTeste.id()), null, null, null, null, null, null, null,
+                LocalDateTime.now().plusDays(30), null));
+        var primeiraEtapa = obterToken(autenticada);
+        mvc.perform(patch("/ordens-servico/" + testeOrdem.id() + "/confeccao").session(autenticada)
+                .header("X-CSRF-TOKEN", primeiraEtapa))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.statusAtual").value("CONFECCAO"))
+                .andExpect(jsonPath("$.valorTotal").doesNotExist());
+        mvc.perform(get("/pecas").session(autenticada)).andExpect(status().isForbidden());
+        mvc.perform(get("/pecas/producao").session(autenticada)).andExpect(status().isOk());
+        var idInexistente = UUID.randomUUID();
+        mvc.perform(get("/ordens-servico/" + idInexistente + "/contrato.pdf").session(autenticada))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/ordens-servico/" + idInexistente + "/pagamentos/1/recibo.pdf").session(autenticada))
+                .andExpect(status().isForbidden());
         mvc.perform(get("/financeiro/despesas").session(autenticada)).andExpect(status().isForbidden());
     }
 
     @Test
-    void devePersistirReservaFluxoERecebimento() {
+    void devePersistirReservaFluxoERecebimento() throws Exception {
         var cpf = gerarCpfParaTeste();
         var cliente = clientes.cadastrarCliente(new ClienteRequestDTO("Cliente teste", "22999999999", "teste@email.com", cpf));
         var peca = pecas.cadastrarPeca(new PecaRequestDTO("Vestido", TipoFluxo.LOCACAO, new BigDecimal("150.00"), "M", "Azul"));
         var inicio = LocalDateTime.of(2030, 10, 10, 10, 0);
         var fim = inicio.plusDays(2);
         var pedido = new OrdemServicoRequestDTO(cliente.id(), TipoFluxo.LOCACAO, List.of(peca.id()),
-                new BigDecimal("10.00"), inicio, fim, null, null, null, null, inicio, null);
+                new BigDecimal("10.00"), inicio, fim, null, null, null, null, inicio, null,
+                List.of(new ItemProducaoRequest(peca.id(), "Busto 92 cm", "Ajustar barra 3 cm")));
 
         var ordem = ordens.abrirOrdemServico(pedido);
         assertEquals(new BigDecimal("140.00"), ordem.valorTotal());
         assertEquals(peca.id(), ordens.buscarPorId(ordem.id()).itens().getFirst().pecaId());
+        assertEquals("Busto 92 cm", ordens.buscarPorId(ordem.id()).itens().getFirst().medidas());
+        assertEquals("Ajustar barra 3 cm", ordens.buscarPorId(ordem.id()).itens().getFirst().instrucoesCostura());
         assertFalse(ordens.disponivelNoPeriodo(peca.id(), inicio.plusDays(1), fim.plusDays(1)));
         assertTrue(ordens.disponivelNoPeriodo(peca.id(), fim, fim.plusDays(1)));
         assertThrows(RegraNegocioException.class, () -> ordens.abrirOrdemServico(pedido));
@@ -508,8 +532,9 @@ class SistemaApplicationTests {
 
         mvc.perform(patch(devolucao).session(atendimento).header("X-CSRF-TOKEN", tokenAtendimento))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.statusAtual").value("DEVOLVIDA"));
-        mvc.perform(get("/pecas/" + pecaId).session(producao))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("EM_LAVAGEM"));
+        mvc.perform(get("/pecas/" + pecaId).session(producao)).andExpect(status().isForbidden());
+        mvc.perform(get("/pecas/producao").session(producao))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[?(@.id == '" + pecaId + "')].status").value("EM_LAVAGEM"));
         mvc.perform(patch(devolucao).session(atendimento).header("X-CSRF-TOKEN", tokenAtendimento))
                 .andExpect(status().isBadRequest());
         mvc.perform(patch(liberacao).session(producao).contentType("application/json").content(confirmacao))

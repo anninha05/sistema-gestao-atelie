@@ -3,6 +3,7 @@ package com.atelie.sistema.peca;
 import com.atelie.sistema.peca.dto.PecaRequestDTO;
 import com.atelie.sistema.peca.dto.LiberacaoPecaRequestDTO;
 import com.atelie.sistema.peca.dto.PecaResponseDTO;
+import com.atelie.sistema.peca.dto.PecaProducaoResponse;
 import com.atelie.sistema.peca.state.StatusDisponibilidade;
 import com.atelie.sistema.shared.exception.RecursoNaoEncontradoException;
 import org.springframework.stereotype.Service;
@@ -56,6 +57,19 @@ public class PecaService {
         return pecaRepository.findAll().stream()
                 .map(this::toResponseDTO)
                 .toList();
+    }
+
+    public List<PecaProducaoResponse> listarParaProducao() {
+        return pecaRepository.findAll().stream()
+                .map(p -> new PecaProducaoResponse(p.getId(), p.getDescricao(), p.getCodigoEtiqueta(),
+                        p.getTamanho(), p.getCor(), p.getStatusDisponibilidade()))
+                .toList();
+    }
+
+    public PecaProducaoResponse buscarParaProducao(UUID id) {
+        Peca peca = buscarEntidadePorId(id);
+        return new PecaProducaoResponse(peca.getId(), peca.getDescricao(), peca.getCodigoEtiqueta(),
+                peca.getTamanho(), peca.getCor(), peca.getStatusDisponibilidade());
     }
 
     public PecaResponseDTO buscarPorId(UUID id) {

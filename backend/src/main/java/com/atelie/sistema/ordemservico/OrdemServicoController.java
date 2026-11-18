@@ -5,6 +5,7 @@ import com.atelie.sistema.ordemservico.dto.OrdemServicoResponseDTO;
 import com.atelie.sistema.ordemservico.dto.PagamentoResponse;
 import com.atelie.sistema.ordemservico.dto.RegistrarPagamentoRequest;
 import com.atelie.sistema.ordemservico.dto.ReagendarOrdemServicoRequest;
+import com.atelie.sistema.ordemservico.dto.OrdemProducaoResponse;
 import com.atelie.sistema.ordemservico.state.StatusOrdemServico;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.core.Authentication;
 
 @RestController
 @RequestMapping("/ordens-servico")
@@ -32,6 +34,12 @@ public class OrdemServicoController {
     public ResponseEntity<List<OrdemServicoResponseDTO>> listar() {
         return ResponseEntity.ok(ordemServicoService.listarTodas());
     }
+
+    @GetMapping("/producao")
+    public ResponseEntity<List<OrdemProducaoResponse>> listarFilaProducao() {
+        return ResponseEntity.ok(ordemServicoService.listarFilaProducao());
+    }
+
 
     @GetMapping("/disponibilidade")
     public java.util.Map<String, Boolean> consultarDisponibilidade(
@@ -58,18 +66,21 @@ public class OrdemServicoController {
     }
 
     @PatchMapping("/{id}/confeccao")
-    public ResponseEntity<OrdemServicoResponseDTO> iniciarConfeccao(@PathVariable UUID id) {
-        return ResponseEntity.ok(ordemServicoService.iniciarConfeccao(id));
+    public ResponseEntity<?> iniciarConfeccao(@PathVariable UUID id, Authentication usuario) {
+        ordemServicoService.iniciarConfeccao(id);
+        return ResponseEntity.ok(respostaAtualizada(id, usuario));
     }
 
     @PatchMapping("/{id}/prova")
-    public ResponseEntity<OrdemServicoResponseDTO> enviarParaProva(@PathVariable UUID id) {
-        return ResponseEntity.ok(ordemServicoService.enviarParaProva(id));
+    public ResponseEntity<?> enviarParaProva(@PathVariable UUID id, Authentication usuario) {
+        ordemServicoService.enviarParaProva(id);
+        return ResponseEntity.ok(respostaAtualizada(id, usuario));
     }
 
     @PatchMapping("/{id}/passadoria")
-    public OrdemServicoResponseDTO iniciarPassadoria(@PathVariable UUID id) {
-        return ordemServicoService.iniciarPassadoria(id);
+    public ResponseEntity<?> iniciarPassadoria(@PathVariable UUID id, Authentication usuario) {
+        ordemServicoService.iniciarPassadoria(id);
+        return ResponseEntity.ok(respostaAtualizada(id, usuario));
     }
 
     @PatchMapping("/{id}/cancelar")
@@ -78,8 +89,9 @@ public class OrdemServicoController {
     }
 
     @PatchMapping("/{id}/concluir")
-    public ResponseEntity<OrdemServicoResponseDTO> concluir(@PathVariable UUID id) {
-        return ResponseEntity.ok(ordemServicoService.concluir(id));
+    public ResponseEntity<?> concluir(@PathVariable UUID id, Authentication usuario) {
+        ordemServicoService.concluir(id);
+        return ResponseEntity.ok(respostaAtualizada(id, usuario));
     }
 
     @PatchMapping("/{id}/retirar")
@@ -109,5 +121,10 @@ public class OrdemServicoController {
     @GetMapping("/{id}/pagamentos")
     public ResponseEntity<PagamentoResponse> buscarPagamento(@PathVariable UUID id) {
         return ResponseEntity.ok(ordemServicoService.buscarPagamento(id));
+    }
+
+    private Object respostaAtualizada(UUID id, Authentication usuario) {
+        boolean producao = usuario.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_PRODUCAO"));
+        return producao ? ordemServicoService.buscarParaProducao(id) : ordemServicoService.buscarPorId(id);
     }
 }
