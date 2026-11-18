@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { api, enviarComCsrf } from './api.js';
+import { api, enviarComCsrf, requisitarComCsrf } from './api.js';
 import { Aviso, Icone, Modal, validarCampos } from './Interface.jsx';
 import './styles/catalogo.css';
 
 export default function Catalogo({
   titulo, descricao, caminho, rotuloCadastro, rotuloBusca, correspondeABusca, filtros,
   campos, montarDados, tituloDoItem, detalhesDoItem, acoesDoItem, aoCadastrar, validar, cadastroDesabilitado = false, abrirAoEntrar = false,
+  camposEdicao, montarDadosEdicao,
 }) {
   const [itens, setItens] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -16,6 +17,7 @@ export default function Catalogo({
   const [salvando, setSalvando] = useState(false);
   const [erroAoSalvar, setErroAoSalvar] = useState('');
   const [confirmacao, setConfirmacao] = useState('');
+  const [itemEmEdicao, setItemEmEdicao] = useState(null);
 
   useEffect(() => {
     const controlador = new AbortController();
@@ -64,6 +66,28 @@ export default function Catalogo({
     }
   }
 
+  async function salvarEdicao(evento) {
+    evento.preventDefault();
+    const formulario = new FormData(evento.currentTarget);
+    const erroDeValidacao = validarCampos(evento.currentTarget);
+    if (erroDeValidacao) {
+      setErroAoSalvar(erroDeValidacao);
+      return;
+    }
+    setSalvando(true);
+    setErroAoSalvar('');
+    try {
+      const { data } = await requisitarComCsrf('patch', caminho + '/' + itemEmEdicao.id, montarDadosEdicao(formulario, itemEmEdicao));
+      atualizarItem(data);
+      setItemEmEdicao(null);
+      setConfirmacao('Cadastro atualizado.');
+    } catch (falha) {
+      setErroAoSalvar(falha.response?.data?.mensagem || 'Não foi possível atualizar o cadastro. Tente novamente.');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
   function atualizarItem(itemAtualizado) {
     setItens((anteriores) => anteriores.map((registro) => registro.id === itemAtualizado.id ? itemAtualizado : registro));
   }
@@ -106,6 +130,18 @@ export default function Catalogo({
           </form>
         </Modal>
       )}
+      {itemEmEdicao && camposEdicao && !cadastroDesabilitado && (
+        <Modal titulo={'Editar ' + tituloDoItem(itemEmEdicao)} aoFechar={() => setItemEmEdicao(null)} ocupado={salvando}>
+          <form className="catalogo-form" onSubmit={salvarEdicao} aria-busy={salvando} noValidate>
+            {erroAoSalvar && <Aviso>{erroAoSalvar}</Aviso>}
+            <fieldset disabled={salvando}>{camposEdicao(itemEmEdicao)}</fieldset>
+            <div className="modal-acoes">
+              <button className="botao-secundario" type="button" onClick={() => setItemEmEdicao(null)} disabled={salvando}>Cancelar</button>
+              <button type="submit" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar alterações'}</button>
+            </div>
+          </form>
+        </Modal>
+      )}
       {confirmacao && <Aviso tipo="sucesso">{confirmacao}</Aviso>}
 
       <div className="catalogo-filtros">
@@ -131,11 +167,13 @@ export default function Catalogo({
           ) : (
             <ul className="catalogo-lista" role="list">
               {itensVisiveis.map((registro) => (
-                <li key={registro.id}>
+                <li key={registro.id} id={registro.id}>
                   <h2>{tituloDoItem(registro)}</h2>
                   <dl>{detalhesDoItem(registro).map(([rotulo, valor]) => (
                     <div key={rotulo}><dt>{rotulo}</dt><dd>{valor ?? '—'}</dd></div>
                   ))}</dl>
+                  {camposEdicao && !cadastroDesabilitado && <button type="button" className="botao-secundario"
+                    onClick={() => { setErroAoSalvar(''); setItemEmEdicao(registro); }}>Editar</button>}
                   {acoesDoItem?.(registro, atualizarItem)}
                 </li>
               ))}

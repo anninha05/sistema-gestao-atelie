@@ -53,6 +53,18 @@ export default function PecasPage({ titulo }) {
         cor: formulario.get('cor').trim() || null,
         valorBase: Number(formulario.get('valorBase')),
       })}
+      camposEdicao={(peca) => <>
+        <label>Descrição<input name="descricao" defaultValue={peca.descricao} maxLength={255} required /></label>
+        <label>Tamanho<input name="tamanho" defaultValue={peca.tamanho || ''} maxLength={10} /></label>
+        <label>Cor<input name="cor" defaultValue={peca.cor || ''} maxLength={50} /></label>
+        <label>Valor base (R$)<input name="valorBase" type="number" inputMode="decimal" defaultValue={peca.valorBase}
+          min="0" max="99999999.99" step="0.01" required /></label>
+      </>}
+      montarDadosEdicao={(formulario, peca) => ({
+        descricao: formulario.get('descricao').trim(), tipo: peca.tipo,
+        tamanho: formulario.get('tamanho').trim() || null,
+        cor: formulario.get('cor').trim() || null, valorBase: Number(formulario.get('valorBase')),
+      })}
       aoCadastrar={() => {
         setTipo('');
         setEstado('');
