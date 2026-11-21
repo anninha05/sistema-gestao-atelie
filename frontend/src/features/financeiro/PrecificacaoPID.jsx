@@ -19,9 +19,6 @@ function valorCampo(valor) {
 export default function PrecificacaoPID({ mes }) {
   const [meta, setMeta] = useState(null);
   const [valorMeta, setValorMeta] = useState('');
-  const [pisoCadastrado, setPisoCadastrado] = useState(null);
-  const [carregandoPiso, setCarregandoPiso] = useState(false);
-  const [editandoPiso, setEditandoPiso] = useState(false);
   const [indicadores, setIndicadores] = useState(null);
   const [ordens, setOrdens] = useState([]);
   const [ordemId, setOrdemId] = useState('');
@@ -33,7 +30,6 @@ export default function PrecificacaoPID({ mes }) {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
   const [erroMeta, setErroMeta] = useState('');
-  const [erroPiso, setErroPiso] = useState('');
   const [sucesso, setSucesso] = useState('');
   const [operacao, setOperacao] = useState('');
   const [calibracao, setCalibracao] = useState(null);
@@ -71,40 +67,8 @@ export default function PrecificacaoPID({ mes }) {
   }, [mes]);
 
   useEffect(() => {
-    let ativa = true;
-    setPisoCadastrado(null);
     setPisoMinimo('');
-    setEditandoPiso(false);
-    setErroPiso('');
-    if (!ordemId) return;
-    setCarregandoPiso(true);
-    api.get('/precificacao/ordens/' + ordemId + '/preco-minimo')
-      .then(({ data }) => {
-        if (!ativa) return;
-        setPisoCadastrado(data.valor);
-        setPisoMinimo(String(data.valor));
-      })
-      .catch((falha) => {
-        if (!ativa) return;
-        if (falha.response?.status === 404) setEditandoPiso(true);
-        else setErroPiso(mensagemDaFalha(falha, 'Não foi possível consultar o preço mínimo.'));
-      })
-      .finally(() => { if (ativa) setCarregandoPiso(false); });
-    return () => { ativa = false; };
   }, [ordemId]);
-
-  async function salvarPiso() {
-    setOperacao('piso'); setErroPiso(''); limparResultado();
-    try {
-      const { data } = await requisitarComCsrf('put', '/precificacao/ordens/' + ordemId + '/preco-minimo', {
-        valor: pisoMinimo === '' ? null : Number(pisoMinimo),
-      });
-      setPisoCadastrado(data.valor);
-      setEditandoPiso(false);
-      setSucesso('Preço mínimo cadastrado. Agora consulte a sugestão.');
-    } catch (falha) { setErroPiso(mensagemDaFalha(falha, 'Não foi possível salvar o preço mínimo.')); }
-    finally { setOperacao(''); }
-  }
 
   function limparResultado() {
     setCalculo(null);
@@ -119,7 +83,7 @@ export default function PrecificacaoPID({ mes }) {
     setOperacao('meta'); setErro(''); setErroMeta(''); setSucesso('');
     try {
       const { data } = await requisitarComCsrf('put', '/precificacao/metas/' + mes, {
-        valorMeta: Number(valorMeta), indicador: 'RESULTADO_DE_CAIXA',
+        valorMeta: Number(valorMeta),
       });
       setMeta(data);
       setSucesso(`Meta de ${moeda.format(data.valorMeta)} salva para ${mes}.`);
@@ -135,7 +99,7 @@ export default function PrecificacaoPID({ mes }) {
     setOperacao('simular'); setErro(''); setSucesso(''); setSugestao(null); setCalculo(null);
     try {
       const { data } = await requisitarComCsrf('post', '/precificacao/sugestoes', {
-        ordemServicoId: ordemId,
+        ordemServicoId: ordemId, pisoMinimo: Number(pisoMinimo),
       });
       setCalculo(data);
       setSugestao(data);
@@ -148,13 +112,11 @@ export default function PrecificacaoPID({ mes }) {
     if (!sugestao) return;
     setOperacao('aprovar'); setErro(''); setSucesso('');
     try {
-      const { data } = await requisitarComCsrf('post', '/ordens-servico/' + sugestao.ordemServicoId + '/aprovar-preco', {
-        sugestaoId: sugestao.id,
-      });
+      const { data } = await requisitarComCsrf('post', '/precificacao/sugestoes/' + sugestao.id + '/aprovar');
       setConfirmacaoAberta(false);
-      setSucesso(`Preço atualizado de ${moeda.format(data.valorAnterior)} para ${moeda.format(data.valorAprovado)}. A aprovação foi registrada.`);
-      setOrdens((atuais) => atuais.map((ordem) => ordem.id === sugestao.ordemServicoId
-        ? { ...ordem, valorTotal: data.valorAprovado } : ordem));
+      setSucesso(`Preço atualizado de ${moeda.format(data.precoBase)} para ${moeda.format(data.precoSugerido)}. A aprovação foi registrada.`);
+      setOrdens((atuais) => atuais.map((ordem) => ordem.id === data.ordemServicoId
+        ? { ...ordem, valorTotal: data.precoSugerido } : ordem));
       setSugestao(null);
       setCalculo(null);
 
@@ -260,23 +222,11 @@ export default function PrecificacaoPID({ mes }) {
             <Selecao rotulo="Ordem de serviço" valor={ordemId} aoSelecionar={(novoId) => {
               setOrdemId(novoId); limparResultado();
             }} opcoes={opcoesDeOrdens} textoInicial="Pesquise uma ordem reservada" pesquisar="Pesquisar por cliente" />
-            <button type="submit" disabled={!ordemId || !meta || pisoCadastrado == null || editandoPiso || carregandoPiso || operacao !== ''}>{operacao === 'simular' ? 'Calculando…' : 'Consultar sugestão'}</button>
+            <label>Preço mínimo desta OS (R$)<input type="number" min="0.01" max="99999999.99" step="0.01" required
+              value={pisoMinimo} onChange={(evento) => { setPisoMinimo(evento.target.value); limparResultado(); }} /></label>
+            <button type="submit" disabled={!ordemId || !meta || operacao !== ''}>{operacao === 'simular' ? 'Calculando…' : 'Consultar sugestão'}</button>
           </fieldset></form>
-          {erroPiso && <Aviso>{erroPiso}</Aviso>}
-          {carregandoPiso && <p role="status">Consultando preço mínimo…</p>}
-          {ordemSelecionada && !carregandoPiso && <div className="pid-piso">
-            {editandoPiso ? <>
-              <label>Preço mínimo desta OS (R$)<input type="number" min="0.01" max="99999999.99" step="0.01"
-                value={pisoMinimo} disabled={operacao !== ''} onChange={(evento) => { setPisoMinimo(evento.target.value); limparResultado(); }} /></label>
-              <p>Cadastre uma vez o menor valor que cobre seus custos e a margem desejada. As sugestões respeitarão esse mínimo.</p>
-              <button type="button" className="botao-secundario" onClick={salvarPiso} disabled={operacao !== ''}>
-                {operacao === 'piso' ? 'Salvando…' : 'Salvar preço mínimo'}
-              </button>
-            </> : pisoCadastrado != null && <>
-              <p>Preço mínimo cadastrado: <strong>{moeda.format(pisoCadastrado)}</strong>.</p>
-              <button type="button" className="botao-secundario" disabled={operacao !== ''} onClick={() => { setEditandoPiso(true); limparResultado(); }}>Alterar mínimo</button>
-            </>}
-          </div>}
+          <p className="pid-observacao">O preço mínimo é o menor valor que cobre seus custos e a margem desejada; a sugestão nunca fica abaixo dele.</p>
           {!meta && <Aviso tipo="info">Salve a meta do mês antes de consultar uma sugestão.</Aviso>}
           {ordemSelecionada && !calculo && <p>Preço atual de <strong>{ordemSelecionada.clienteNome}</strong>: <strong>{moeda.format(ordemSelecionada.valorTotal)}</strong>.</p>}
           {calculo && <div className="pid-resultado" aria-live="polite">

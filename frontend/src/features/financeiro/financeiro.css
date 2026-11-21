@@ -80,5 +80,4 @@ fieldset.pid-form-simulacao { border: 0; margin: 0; padding: 0; min-width: 0; }
 .pid-historico > summary { cursor: pointer; color: #71334c; font-weight: 650; }
 
 .pid-form-simulacao { grid-template-columns: minmax(0, 1fr) auto; }
-.pid-piso { padding: 1rem; border: 1px solid #e9d2dd; border-radius: .7rem; }
 @media (max-width: 760px) { .pid-form-simulacao { grid-template-columns: minmax(0, 1fr); } }
