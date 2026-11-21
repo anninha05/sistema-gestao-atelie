@@ -120,6 +120,8 @@
 .fila-etapas button span { color: var(--muted); font-size: .8rem; }
 .fila-etapas button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-suave); color: var(--accent-texto); font-weight: 600; }
 .fila-etapas button[aria-pressed="true"] span { color: inherit; }
+.fila-etapas button:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-suave); color: var(--accent-texto); }
+.fila-etapas button:hover:not(:disabled) span { color: inherit; }
 .fila-titulo { margin: 0 0 .75rem; }
 .fila-prazo { display: inline-flex; align-items: center; gap: .35rem; margin-top: .35rem; color: #865611; font-size: .82rem; font-weight: 500; }
 .fila-prazo .icone { width: .95rem; height: .95rem; }
