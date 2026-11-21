@@ -71,7 +71,7 @@ fieldset.pid-form-simulacao { display: grid; grid-template-columns: minmax(0, 1f
 .pid-resultado > p { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
 .pid-resultado summary { cursor: pointer; color: var(--accent-texto); font-size: .9rem; font-weight: 600; }
 .pid-resultado .modal-acoes { margin-top: .5rem; }
-.pid-etiqueta { padding: .25rem .65rem; border-radius: 99px; background: var(--accent-suave); color: var(--accent-texto); font-size: .75rem; font-weight: 600; }
+.pid-etiqueta { padding: .35rem .75rem; border-radius: .5rem; background: var(--accent-suave); color: var(--accent-texto); font-size: .82rem; font-weight: 600; }
 
 @media (min-width: 48rem) {
   .pid-cartoes-configuracao { grid-template-columns: minmax(0, .9fr) minmax(0, 1.4fr); }

@@ -126,11 +126,11 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .etiqueta {
   display: inline-flex;
   align-items: center;
-  padding: .2rem .6rem;
-  border-radius: 99px;
+  padding: .35rem .75rem;
+  border-radius: .5rem;
   background: #f0eeeb;
   color: #57524e;
-  font-size: .75rem;
+  font-size: .82rem;
   font-weight: 600;
   white-space: nowrap;
 }
