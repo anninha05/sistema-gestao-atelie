@@ -36,6 +36,8 @@ export default function PrecificacaoPID({ mes }) {
   const [erroPiso, setErroPiso] = useState('');
   const [sucesso, setSucesso] = useState('');
   const [operacao, setOperacao] = useState('');
+  const [calibracao, setCalibracao] = useState(null);
+  const [erroCalibracao, setErroCalibracao] = useState('');
 
   const opcoesDeOrdens = useMemo(() => ordens.map((ordem) => [ordem.id,
     `${ordem.clienteNome} · ${ordem.tipoFluxo === 'LOCACAO' ? 'Locação' : 'Sob medida'} · ${moeda.format(ordem.valorTotal)}`,
@@ -160,6 +162,17 @@ export default function PrecificacaoPID({ mes }) {
     finally { setOperacao(''); }
   }
 
+  async function calibrar() {
+    setOperacao('calibrar');
+    setErroCalibracao('');
+    try {
+      const { data } = await requisitarComCsrf('post', '/precificacao/politica/calibrar');
+      setCalibracao(data);
+    } catch (falha) {
+      setErroCalibracao(mensagemDaFalha(falha, 'Não foi possível calibrar os ganhos. Tente novamente.'));
+    } finally { setOperacao(''); }
+  }
+
   const ultimaExecucao = execucoes[0];
   const ordemSelecionada = ordens.find((ordem) => ordem.id === ordemId);
 
@@ -218,6 +231,24 @@ export default function PrecificacaoPID({ mes }) {
             </div>
           )}
           <p className="pid-observacao">As sugestões consideram o resultado de caixa e o histórico do cliente. Você decide se deseja aplicar o preço.</p>
+        </details>
+
+        <details className="pid-cartao pid-historico">
+          <summary>Aprendizado do agente</summary>
+          <p>O agente testa combinações de ganhos em meses simulados do ateliê e mantém a que acompanha a meta com menos erro e menos variação de preço. Os limites de ajuste não mudam.</p>
+          {erroCalibracao && <Aviso>{erroCalibracao}</Aviso>}
+          <button type="button" onClick={calibrar} disabled={operacao !== ''}>
+            {operacao === 'calibrar' ? 'Calibrando…' : 'Calibrar por simulação'}
+          </button>
+          {calibracao && (
+            <div className="pid-indicadores">
+              <div><span>Ganhos anteriores (Kp · Ki · Kd)</span><strong>{[calibracao.kpAnterior, calibracao.kiAnterior, calibracao.kdAnterior].map((g) => g.toFixed(3)).join(' · ')}</strong></div>
+              <div><span>Ganhos calibrados (Kp · Ki · Kd)</span><strong>{[calibracao.kp, calibracao.ki, calibracao.kd].map((g) => g.toFixed(3)).join(' · ')}</strong></div>
+              <div><span>Custo nos meses simulados</span><strong>{calibracao.custoAnterior.toFixed(4)} → {calibracao.custo.toFixed(4)}</strong></div>
+              <div><span>Redução do custo</span><strong>{percentual(1 - calibracao.custo / calibracao.custoAnterior)}</strong></div>
+              <div><span>Iterações da busca</span><strong>{calibracao.iteracoes}</strong></div>
+            </div>
+          )}
         </details>
 
         <div className="pid-cartao pid-simulacao">
