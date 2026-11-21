@@ -117,10 +117,13 @@ function ConteudoPagamentos({ ordem, aoFechar, aoAtualizarOrdem }) {
   );
 }
 
-export default function PagamentosDaOrdem({ ordem, aoAtualizar }) {
+export default function PagamentosDaOrdem({ ordem, aoAtualizar, aoFechar, rotulo = 'Pagamentos e saldo' }) {
   const [aberto, setAberto] = useState(false);
   return <>
-    <button className="botao-secundario" type="button" aria-haspopup="dialog" onClick={() => setAberto(true)}>Pagamentos e saldo</button>
-    {aberto && <ConteudoPagamentos ordem={ordem} aoFechar={() => setAberto(false)} aoAtualizarOrdem={aoAtualizar} />}
+    <button className="botao-secundario" type="button" aria-haspopup="dialog" onClick={() => setAberto(true)}>{rotulo}</button>
+    {aberto && <ConteudoPagamentos ordem={ordem} aoAtualizarOrdem={aoAtualizar} aoFechar={() => {
+      setAberto(false);
+      aoFechar?.();
+    }} />}
   </>;
 }

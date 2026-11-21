@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { api } from '../../shared/api.js';
 import Catalogo from '../../shared/Catalogo.jsx';
 import { Aviso, Selecao } from '../../shared/Interface.jsx';
 import AcoesDaOrdem from './AcoesDaOrdem.jsx';
-import PagamentosDaOrdem from './PagamentosDaOrdem.jsx';
 import { dataHora, estadoDaOrdem, moeda, tiposFluxo as tipos } from '../../shared/formatos.js';
 
 function formatarData(valor) {
@@ -179,8 +178,8 @@ export default function OrdensServicoPage({ titulo }) {
         subtituloDoItem={(ordem) => tipos[ordem.tipoFluxo] ?? ordem.tipoFluxo}
         etiquetaDoItem={(ordem) => estadoDaOrdem(ordem.statusAtual)}
         acoesDoItem={(ordem, aoAtualizar) => <>
+          <Link className="botao-link botao-secundario" to={'/ordens-servico/' + ordem.id}>Ver detalhes</Link>
           <AcoesDaOrdem ordem={ordem} aoAtualizar={aoAtualizar} />
-          <PagamentosDaOrdem ordem={ordem} aoAtualizar={aoAtualizar} />
         </>}
         detalhesDoItem={(ordem) => [
           ['Peças', ordem.itens?.map((registro) => nomesDasPecas.get(registro.pecaId) ?? registro.pecaId).join(', ') || '—'],

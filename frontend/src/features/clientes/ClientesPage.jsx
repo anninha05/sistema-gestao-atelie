@@ -30,7 +30,7 @@ function HistoricoCliente({ cliente }) {
             <span>{data ? dataHora.format(new Date(data)) : 'Sem data informada'}</span>
           </div>
           <Etiqueta tom={tom}>{estado}</Etiqueta>
-          <Link to={'/ordens-servico#' + ordem.id} onClick={() => setAberto(false)}>Abrir</Link>
+          <Link to={'/ordens-servico/' + ordem.id} onClick={() => setAberto(false)}>Abrir</Link>
         </li>;
       })}</ul>}
     </Modal>}

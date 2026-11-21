@@ -122,7 +122,7 @@ export default function DashboardPage({ titulo }) {
                       <li key={ordemId + tipoCompromisso}>
                         <time dateTime={dataHora}>{formatoHora.format(new Date(dataHora))}</time>
                         <div>
-                          <Link to={'/ordens-servico#' + ordemId}>{clienteNome}</Link>
+                          <Link to={'/ordens-servico/' + ordemId}>{clienteNome}</Link>
                           <span>{tipoCompromisso}</span>
                         </div>
                         <Etiqueta tom={tom}>{estado}</Etiqueta>

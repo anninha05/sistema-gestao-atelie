@@ -1,0 +1,57 @@
+.ordem-detalhe { display: grid; gap: 1rem; }
+.ordem-detalhe .cabecalho-pagina { margin-bottom: .5rem; }
+.ordem-detalhe h2 { margin: 0; font-size: 1.05rem; }
+.ordem-voltar { display: inline-flex; align-items: center; gap: .35rem; margin-bottom: .6rem; color: var(--muted); font-size: .85rem; text-decoration: none; }
+.ordem-voltar:hover { color: var(--accent-texto); }
+.ordem-voltar .icone { width: 1rem; height: 1rem; }
+.ordem-cartao-topo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
+.ordem-link { display: inline-flex; align-items: center; gap: .25rem; color: var(--accent-texto); font-size: .82rem; font-weight: 600; text-decoration: none; }
+.ordem-link .icone { width: .9rem; height: .9rem; }
+
+.ordem-fluxo-resumo { color: var(--accent-texto); font-size: .8rem; font-weight: 600; }
+.ordem-fluxo ol { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: .75rem; margin: 1rem 0 0; padding: 0; list-style: none; }
+.ordem-fluxo li { display: grid; gap: .15rem; padding-bottom: .7rem; border-bottom: 3px solid #ebe8e4; }
+.ordem-fluxo li strong { color: var(--muted); font-size: .85rem; font-weight: 500; }
+.ordem-fluxo li span { color: var(--muted); font-size: .75rem; }
+.ordem-fluxo li.concluida { border-color: var(--accent-suave-forte); }
+.ordem-fluxo li.concluida strong { color: var(--accent-texto); }
+.ordem-fluxo li.atual { border-color: var(--accent); }
+.ordem-fluxo li.atual strong { color: var(--accent-texto); font-weight: 650; }
+
+.ordem-grade, .ordem-coluna { display: grid; gap: 1rem; align-content: start; min-width: 0; }
+.ordem-coluna > .cartao { display: grid; gap: .75rem; }
+.ordem-cliente-nome { margin: 0; font-weight: 600; }
+.ordem-cliente-contato { display: flex; flex-wrap: wrap; gap: .35rem 1.25rem; margin: 0; color: var(--muted); font-size: .85rem; }
+
+.ordem-tabela { overflow-x: auto; margin: 0 -1.25rem -1.25rem; }
+.ordem-tabela table { width: 100%; min-width: 32rem; border-collapse: collapse; font-size: .88rem; }
+.ordem-tabela th { padding: .6rem 1.25rem; border-block: 1px solid var(--borda); background: var(--superficie-suave); color: var(--muted); font-size: .75rem; font-weight: 500; text-align: left; white-space: nowrap; }
+.ordem-tabela td { padding: .75rem 1.25rem; border-bottom: 1px solid var(--borda); vertical-align: top; }
+.ordem-tabela tr:last-child td { border-bottom: 0; }
+.ordem-tabela td:first-child > * { display: block; margin-top: .15rem; }
+.ordem-tabela td:first-child > strong { margin: 0; }
+.ordem-tabela td span { color: var(--muted); font-size: .8rem; }
+.ordem-tabela td:last-child { white-space: nowrap; }
+.ordem-observacao { margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.45; }
+
+.ordem-agendamento { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .75rem; margin: 0; }
+.ordem-agendamento dt { color: var(--muted); font-size: .72rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.ordem-agendamento dd { margin: .25rem 0 0; font-size: .9rem; }
+
+.ordem-total { margin: 0; color: var(--accent); font: 400 2.4rem/1 var(--serif); letter-spacing: -.02em; }
+.ordem-valores { display: grid; gap: .4rem; margin: 0; font-size: .85rem; }
+.ordem-valores div { display: flex; justify-content: space-between; gap: 1rem; }
+.ordem-valores dt { color: var(--muted); }
+.ordem-valores dd { margin: 0; font-variant-numeric: tabular-nums; }
+.ordem-valores .ordem-saldo { padding-top: .4rem; border-top: 1px solid var(--borda); font-weight: 650; }
+.ordem-valores .ordem-saldo dt { color: var(--texto); }
+.ordem-coluna .etiqueta { justify-self: start; }
+.ordem-coluna .fila-acoes .aviso, .ordem-coluna .acao-bloqueada { flex-basis: 100%; }
+
+.ordem-historico { display: grid; gap: .85rem; margin: 0; padding: 0 0 0 1rem; border-left: 2px solid var(--accent-suave); list-style: none; }
+.ordem-historico li { display: grid; gap: .15rem; font-size: .85rem; }
+.ordem-historico span { color: var(--muted); font-size: .78rem; }
+
+@media (min-width: 64rem) {
+  .ordem-grade { grid-template-columns: minmax(0, 1.65fr) minmax(19rem, 1fr); }
+}

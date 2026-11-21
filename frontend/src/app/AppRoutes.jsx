@@ -6,6 +6,7 @@ import ClientesPage from '../features/clientes/ClientesPage.jsx';
 import RelatoriosPage from '../features/financeiro/RelatoriosPage.jsx';
 import FilaCosturaPage from '../features/ordens-servico/FilaCosturaPage.jsx';
 import OrdensServicoPage from '../features/ordens-servico/OrdensServicoPage.jsx';
+import OrdemServicoDetalhePage from '../features/ordens-servico/OrdemServicoDetalhePage.jsx';
 import DashboardPage from '../features/dashboard/DashboardPage.jsx';
 import PecasPage from '../features/pecas/PecasPage.jsx';
 import LayoutDoAtelie from './WorkspaceLayout.jsx';
@@ -67,6 +68,7 @@ export default function AppRoutes() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/usuarios" element={<Navigate to="/login" replace />} />
+        <Route path="/ordens-servico/:id" element={<Navigate to="/login" replace />} />
         <Route index element={<Navigate to="/login" replace />} />
         {caminhosPrivados.map((caminho) => (
           <Route key={caminho} path={caminho} element={<Navigate to="/login" replace />} />
@@ -91,6 +93,9 @@ export default function AppRoutes() {
     <Routes>
       <Route element={<LayoutDoAtelie perfil={areaDeTrabalho.rotulo} paginas={areaDeTrabalho.paginas} />}>
         {usuario.perfil === 'ROLE_ADMIN' && <Route path="/usuarios" element={<UsuariosPage />} />}
+        {areaDeTrabalho.paginas.some(({ caminho }) => caminho === '/ordens-servico') && (
+          <Route path="/ordens-servico/:id" element={<OrdemServicoDetalhePage />} />
+        )}
         {areaDeTrabalho.paginas.map(({ caminho, rotulo, Pagina }) => (
           <Route key={caminho} path={caminho} element={<Pagina titulo={rotulo} />} />
         ))}

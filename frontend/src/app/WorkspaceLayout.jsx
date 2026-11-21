@@ -17,8 +17,9 @@ export default function LayoutDoAtelie({ perfil, paginas, children }) {
   const [saindo, setSaindo] = useState(false);
   const [erro, setErro] = useState('');
   const [perfilAberto, setPerfilAberto] = useState(false);
-  const paginaAtual = pathname === '/usuarios' ? 'Usuários'
-    : paginas.find(({ caminho }) => caminho === pathname)?.rotulo;
+  const pagina = pathname === '/usuarios' ? { caminho: pathname, rotulo: 'Usuários' }
+    : paginas.find(({ caminho }) => pathname === caminho || pathname.startsWith(caminho + '/'));
+  const emDetalhe = pagina && pathname !== pagina.caminho;
 
   async function sairDaConta() {
     setErro('');
@@ -102,7 +103,9 @@ export default function LayoutDoAtelie({ perfil, paginas, children }) {
         <div className="workspace-topo">
           <nav aria-label="Você está em" className="workspace-trilha">
             <span>Ateliê Lucinéia Padilha</span>
-            {paginaAtual && <><Icone nome="avancar" /><strong>{paginaAtual}</strong></>}
+            {pagina && <><Icone nome="avancar" />{emDetalhe
+              ? <><Link to={pagina.caminho}>{pagina.rotulo}</Link><Icone nome="avancar" /><strong>Detalhes</strong></>
+              : <strong>{pagina.rotulo}</strong>}</>}
           </nav>
           <span className="workspace-data">{dataDeHoje()}</span>
         </div>

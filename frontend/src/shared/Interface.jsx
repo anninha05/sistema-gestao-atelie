@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import {
-  ArrowDownLeft, ArrowUpRight, CalendarDays, ChevronDown, ChevronRight, CircleAlert, CircleCheck, ClipboardList,
+  ArrowDownLeft, ArrowLeft, ArrowUpRight, CalendarDays, ChevronDown, ChevronRight, CircleAlert, CircleCheck, ClipboardList,
   Clock, LayoutGrid, LogOut, Plus, Scissors, Search, Shirt, Target, UserRound, Users, Wallet, X,
 } from 'lucide-react';
 
@@ -8,7 +8,7 @@ const icones = {
   adicionar: Plus, fechar: X, seta: ChevronDown, avancar: ChevronRight, aviso: CircleAlert, sucesso: CircleCheck,
   busca: Search, painel: LayoutGrid, clientes: Users, pecas: Shirt, ordens: ClipboardList, financeiro: Wallet,
   costura: Scissors, perfil: UserRound, sair: LogOut, agenda: CalendarDays, prazo: Clock, meta: Target,
-  entrada: ArrowDownLeft, saida: ArrowUpRight,
+  entrada: ArrowDownLeft, saida: ArrowUpRight, voltar: ArrowLeft,
 };
 
 export function Icone({ nome }) {
