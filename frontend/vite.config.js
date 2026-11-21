@@ -13,7 +13,7 @@ export default defineConfig({
     },
   },
   preview: {
-    allowedHosts: ['anna-win11.tailae599f.ts.net'],
+    allowedHosts: ['anna-win11.tailae599f.ts.net', 'anna-win11.tail1e7309.ts.net'],
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8080',
@@ -25,7 +25,12 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
+      workbox: {
+        cleanupOutdatedCaches: true,
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
+        navigateFallbackDenylist: [/^\/api(?:\/|$)/],
+      },
       manifest: {
         name: 'Linho - Gestão de Ateliê',
         short_name: 'Linho',

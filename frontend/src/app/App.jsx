@@ -3,6 +3,7 @@ import '@fontsource-variable/fraunces';
 import { BrowserRouter } from 'react-router-dom';
 import { ProvedorDeAutenticacao } from '../features/auth/AuthContext.jsx';
 import AppRoutes from './AppRoutes.jsx';
+import AtualizacaoPWA from '../shared/AtualizacaoPWA.jsx';
 import '../shared/styles/base.css';
 
 export default function App() {
@@ -10,6 +11,7 @@ export default function App() {
     <BrowserRouter>
       <ProvedorDeAutenticacao>
         <AppRoutes />
+        <AtualizacaoPWA />
       </ProvedorDeAutenticacao>
     </BrowserRouter>
   );

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Catalogo from '../../shared/Catalogo.jsx';
 import { Aviso, Modal, Selecao, validarCampos } from '../../shared/Interface.jsx';
 import { api, requisitarComCsrf } from '../../shared/api.js';
+import PrecificacaoPID from './PrecificacaoPID.jsx';
 import './financeiro.css';
 
 const caminhoDespesas = '/financeiro/despesas';
@@ -114,6 +115,7 @@ export default function RelatoriosPage({ titulo }) {
         <p className="financeiro-resumo-observacao">{indicadores.observacao}</p>
       </>}
     </section>
+    <PrecificacaoPID mes={mes} />
     <Catalogo titulo={titulo} descricao="Cadastre despesas e acompanhe os pagamentos do ateliê."
       caminho={caminhoDespesas} rotuloCadastro="Nova despesa" rotuloBusca="Buscar por descrição ou categoria"
       correspondeABusca={(despesa, busca) => {

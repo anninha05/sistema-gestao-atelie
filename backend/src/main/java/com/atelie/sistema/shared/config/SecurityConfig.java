@@ -43,7 +43,8 @@ public class SecurityConfig {
                 })
                                 .authorizeHttpRequests(auth -> auth
                                                 .requestMatchers("/auth/csrf", "/auth/login").permitAll()
-                                                .requestMatchers("/usuarios/**", "/financeiro/**").hasRole("ADMIN")
+                                                .requestMatchers("/usuarios/**", "/financeiro/**", "/precificacao/**")
+                                                .hasRole("ADMIN")
                                                 .requestMatchers(HttpMethod.GET, "/dashboard/**")
                                                 .hasAnyRole("ADMIN", "ATENDENTE")
                                                 .requestMatchers(HttpMethod.GET, "/ordens-servico/producao",

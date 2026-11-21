@@ -9,6 +9,19 @@
 }
 
 * { box-sizing: border-box; }
+.atualizacao-pwa {
+  position: fixed;
+  z-index: 100;
+  inset: auto 1rem calc(6rem + env(safe-area-inset-bottom)) auto;
+  width: min(25rem, calc(100% - 2rem));
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: .8rem;
+  background: #fffbfd;
+  box-shadow: 0 .5rem 2rem #39202b26;
+}
+.atualizacao-pwa p { margin: .5rem 0; font-size: .875rem; }
+.atualizacao-pwa button { width: 100%; margin-top: .5rem; }
 body { margin: 0; }
 button, input { font: inherit; }
 
