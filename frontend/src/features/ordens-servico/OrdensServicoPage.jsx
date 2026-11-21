@@ -187,7 +187,7 @@ export default function OrdensServicoPage({ titulo }) {
         tituloDoItem={(ordem) => ordem.clienteNome}
         acoesDoItem={(ordem, aoAtualizar) => <>
           <AcoesDaOrdem ordem={ordem} aoAtualizar={aoAtualizar} />
-          <div className="fila-acoes"><PagamentosDaOrdem ordem={ordem} /></div>
+          <div className="fila-acoes"><PagamentosDaOrdem ordem={ordem} aoAtualizar={aoAtualizar} /></div>
         </>}
         detalhesDoItem={(ordem) => [
           ['Tipo', tipos[ordem.tipoFluxo] ?? ordem.tipoFluxo],

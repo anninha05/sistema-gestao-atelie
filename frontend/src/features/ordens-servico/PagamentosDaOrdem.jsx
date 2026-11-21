@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api, requisitarComCsrf, baixarPdf } from '../../shared/api.js';
 import { Aviso, Modal, Selecao, validarCampos } from '../../shared/Interface.jsx';
+import { oferece } from './acoes.js';
 
 const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const metodos = [['PIX', 'Pix'], ['CARTAO', 'Cartão'], ['DINHEIRO', 'Dinheiro'], ['TRANSFERENCIA', 'Transferência']];
 const situacoes = { PENDENTE: 'Pendente', SINAL_PAGO: 'Pagamento parcial', QUITADO: 'Quitado' };
 
-function ConteudoPagamentos({ ordem, aoFechar }) {
+function ConteudoPagamentos({ ordem, aoFechar, aoAtualizarOrdem }) {
   const [pagamento, setPagamento] = useState(null);
   const [erro, setErro] = useState('');
   const [salvando, setSalvando] = useState(false);
@@ -16,6 +17,7 @@ function ConteudoPagamentos({ ordem, aoFechar }) {
   const [consultando, setConsultando] = useState(true);
   const [baixandoRecibo, setBaixandoRecibo] = useState(null);
   const caminho = '/ordens-servico/' + ordem.id + '/pagamentos';
+  const podeReceber = oferece(ordem, 'REGISTRAR_RECEBIMENTO');
 
   useEffect(() => {
     const controlador = new AbortController();
@@ -53,6 +55,7 @@ function ConteudoPagamentos({ ordem, aoFechar }) {
       setPagamento(data);
       formulario.reset();
       setConfirmacao('Recebimento registrado.');
+      api.get('/ordens-servico/' + ordem.id).then(({ data: atualizada }) => aoAtualizarOrdem(atualizada)).catch(() => {});
     } catch (falha) {
       setPrecisaAtualizar(true);
       setErro(falha.response?.data?.mensagem || 'Não foi possível registrar. Consulte os pagamentos antes de tentar novamente.');
@@ -90,7 +93,10 @@ function ConteudoPagamentos({ ordem, aoFechar }) {
                 finally { setBaixandoRecibo(null); }
               }}>{baixandoRecibo === item.id ? 'Gerando…' : 'Recibo PDF'}</button></li>
         ))}</ul>
-        {pagamento.saldoDevedor > 0 && (
+        {pagamento.saldoDevedor > 0 && !podeReceber && (
+          <p>Esta ordem não aceita novos recebimentos{ordem.pendenciaAcerto ? '; há uma pendência de acerto registrada' : ''}.</p>
+        )}
+        {podeReceber && pagamento.saldoDevedor > 0 && (
           <form className="catalogo-form" noValidate onSubmit={salvar}>
             <fieldset disabled={salvando || consultando || precisaAtualizar}>
               <label>Valor (R$)<input name="valor" type="number" min="0.01" step="0.01"
@@ -111,10 +117,10 @@ function ConteudoPagamentos({ ordem, aoFechar }) {
   );
 }
 
-export default function PagamentosDaOrdem({ ordem }) {
+export default function PagamentosDaOrdem({ ordem, aoAtualizar }) {
   const [aberto, setAberto] = useState(false);
   return <>
     <button className="botao-secundario" type="button" aria-haspopup="dialog" onClick={() => setAberto(true)}>Pagamentos e saldo</button>
-    {aberto && <ConteudoPagamentos ordem={ordem} aoFechar={() => setAberto(false)} />}
+    {aberto && <ConteudoPagamentos ordem={ordem} aoFechar={() => setAberto(false)} aoAtualizarOrdem={aoAtualizar} />}
   </>;
 }

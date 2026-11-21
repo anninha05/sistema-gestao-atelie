@@ -2,16 +2,7 @@ import { useContext, useState } from 'react';
 import { ContextoDeAutenticacao } from '../auth/AuthContext.jsx';
 import { requisitarComCsrf, baixarPdf } from '../../shared/api.js';
 import { Aviso, Modal } from '../../shared/Interface.jsx';
-
-const acoesDeProducao = {
-  PENDENTE: [['confeccao', 'Iniciar trabalho'], ['prova', 'Enviar para prova']],
-  RESERVADA: [['confeccao', 'Iniciar trabalho'], ['prova', 'Enviar para prova']],
-  CONFECCAO: [['prova', 'Enviar para prova']],
-  PROVA: [['confeccao', 'Iniciar ajustes']],
-  EM_PROVA: [['confeccao', 'Iniciar ajustes'], ['passadoria', 'Iniciar passadoria']],
-  AJUSTES: [['prova', 'Enviar para prova'], ['passadoria', 'Iniciar passadoria']],
-  PASSADORIA: [['concluir', 'Concluir produção']],
-};
+import { acoesDiretas, oferece, rotasDasAcoes } from './acoes.js';
 
 export default function AcoesDaOrdem({ ordem, aoAtualizar }) {
   const { usuario } = useContext(ContextoDeAutenticacao);
@@ -19,32 +10,22 @@ export default function AcoesDaOrdem({ ordem, aoAtualizar }) {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const [confirmacao, setConfirmacao] = useState('');
-  const acoes = usuario.perfil === 'ROLE_ADMIN'
-    ? [...(acoesDeProducao[ordem.statusAtual] ?? [])] : [];
-  const atendimento = ['ROLE_ADMIN', 'ROLE_ATENDENTE'].includes(usuario.perfil);
-  const podeReagendar = atendimento && !["RETIRADA", "ENTREGUE", "DEVOLVIDA", "CANCELADA"].includes(ordem.statusAtual);
   const [reagendamentoAberto, setReagendamentoAberto] = useState(false);
   const [erroDocumento, setErroDocumento] = useState('');
   const [gerandoDocumento, setGerandoDocumento] = useState(false);
-
-  if (atendimento && ordem.statusAtual === 'CONCLUIDO') {
-    acoes.push(['retirar', ordem.tipoFluxo === 'LOCACAO' ? 'Registrar retirada' : 'Registrar entrega']);
-  }
-  if (atendimento && ordem.tipoFluxo === 'LOCACAO' && ordem.statusAtual === 'RETIRADA') {
-    acoes.push(['devolver', 'Registrar devolução']);
-  }
-  if (atendimento && ['PENDENTE', 'RESERVADA', 'CONFECCAO', 'PROVA', 'EM_PROVA', 'AJUSTES', 'PASSADORIA', 'CONCLUIDO'].includes(ordem.statusAtual)) {
-    acoes.push(['cancelar', 'Cancelar ordem']);
-  }
+  const acoes = acoesDiretas(ordem);
+  const podeReagendar = oferece(ordem, 'REAGENDAR');
+  const podeEmitirContrato = ['ROLE_ADMIN', 'ROLE_ATENDENTE'].includes(usuario.perfil) && ordem.tipoFluxo === 'LOCACAO';
+  const bloqueios = acoes.filter((item) => !item.habilitada);
 
   async function confirmar() {
     setSalvando(true);
     setErro('');
     try {
-      const { data } = await requisitarComCsrf('patch', '/ordens-servico/' + ordem.id + '/' + acaoEscolhida[0]);
+      const { data } = await requisitarComCsrf('patch', '/ordens-servico/' + ordem.id + '/' + rotasDasAcoes[acaoEscolhida.acao]);
       aoAtualizar(data);
       setAcaoEscolhida(null);
-      setConfirmacao(acaoEscolhida[0] === 'devolver'
+      setConfirmacao(acaoEscolhida.acao === 'DEVOLVER'
         ? 'Devolução registrada. As peças estão em lavagem; libere-as no inventário após a conferência.'
         : 'Estado da ordem atualizado.');
     } catch (falha) {
@@ -58,7 +39,7 @@ export default function AcoesDaOrdem({ ordem, aoAtualizar }) {
     <div>
       {confirmacao && <Aviso tipo="sucesso">{confirmacao}</Aviso>}
       <div className="fila-acoes">
-        {atendimento && ordem.tipoFluxo === 'LOCACAO' && <button type="button" className="botao-secundario"
+        {podeEmitirContrato && <button type="button" className="botao-secundario"
           disabled={gerandoDocumento} onClick={async () => {
             setGerandoDocumento(true); setErroDocumento('');
             try { await baixarPdf('/ordens-servico/' + ordem.id + '/contrato.pdf', 'contrato-' + ordem.id + '.pdf'); }
@@ -67,16 +48,23 @@ export default function AcoesDaOrdem({ ordem, aoAtualizar }) {
           }}>{gerandoDocumento ? 'Gerando contrato…' : 'Baixar contrato PDF'}</button>}
         {podeReagendar && <button type="button" className="botao-secundario"
           onClick={() => { setErro(""); setReagendamentoAberto(true); }}>Reagendar</button>}
-        {acoes.map(([acao, rotulo]) => (
-          <button key={acao} type="button" aria-haspopup="dialog"
-            className={acao === 'cancelar' ? 'botao-secundario' : undefined}
+        {acoes.map((item) => (
+          <button key={item.acao} type="button" aria-haspopup="dialog"
+            className={item.acao === 'CANCELAR' ? 'botao-secundario' : undefined}
+            disabled={!item.habilitada}
+            aria-describedby={item.habilitada ? undefined : 'bloqueio-' + ordem.id + '-' + item.acao}
             onClick={() => {
               setErro('');
               setConfirmacao('');
-              setAcaoEscolhida([acao, rotulo]);
-            }}>{rotulo}</button>
+              setAcaoEscolhida(item);
+            }}>{item.rotulo}</button>
         ))}
       </div>
+      {bloqueios.map((item) => (
+        <p key={item.acao} id={'bloqueio-' + ordem.id + '-' + item.acao} className="acao-bloqueada">
+          {item.rotulo}: {item.motivoBloqueio}
+        </p>
+      ))}
       {erroDocumento && <Aviso>{erroDocumento}</Aviso>}
       {reagendamentoAberto && <Modal titulo="Reagendar ordem" ocupado={salvando} aoFechar={() => setReagendamentoAberto(false)}>
         <form className="catalogo-form" onSubmit={async (evento) => {
@@ -121,18 +109,18 @@ export default function AcoesDaOrdem({ ordem, aoAtualizar }) {
         </form>
       </Modal>}
       {acaoEscolhida && (
-        <Modal titulo={acaoEscolhida[1]} ocupado={salvando} aoFechar={() => setAcaoEscolhida(null)}>
+        <Modal titulo={acaoEscolhida.rotulo} ocupado={salvando} aoFechar={() => setAcaoEscolhida(null)}>
           <p>Confirma esta ação na ordem de {ordem.clienteNome}?</p>
-          {acaoEscolhida[0] === 'retirar' && (
+          {acaoEscolhida.acao === 'RETIRAR' && (
             <p>A ordem precisa estar quitada e com a produção concluída.
               {ordem.tipoFluxo === 'LOCACAO' && ' As peças também precisam estar disponíveis no inventário e serão marcadas como alugadas.'}
             </p>
           )}
-          {acaoEscolhida[0] === 'cancelar' && <p>O cancelamento encerra o fluxo desta ordem.</p>}
-          {acaoEscolhida[0] === 'cancelar' && ordem.pendenciaAcerto && (
+          {acaoEscolhida.acao === 'CANCELAR' && <p>O cancelamento encerra o fluxo desta ordem.</p>}
+          {acaoEscolhida.acao === 'CANCELAR' && ordem.pendenciaAcerto && (
             <p>Há valores recebidos nesta ordem. O cancelamento manterá o histórico e registrará uma pendência de acerto, sem estorno automático.</p>
           )}
-          {acaoEscolhida[0] === 'devolver' && (
+          {acaoEscolhida.acao === 'DEVOLVER' && (
             <p>Todas as peças desta locação serão encaminhadas à lavagem. Elas continuarão indisponíveis
               até a conclusão da lavagem e a liberação após conferência no inventário.</p>
           )}

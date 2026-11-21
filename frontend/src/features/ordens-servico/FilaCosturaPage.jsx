@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'react';
 import { api, requisitarComCsrf } from '../../shared/api.js';
 import { Aviso } from '../../shared/Interface.jsx';
+import { acoesDiretas, rotasDasAcoes } from './acoes.js';
 import '../../shared/styles/catalogo.css';
 
-const inicio = [['confeccao', 'Iniciar trabalho'], ['prova', 'Enviar para prova']];
-const emProva = [['confeccao', 'Iniciar ajustes'], ['passadoria', 'Iniciar passadoria']];
 const etapas = [
-  { rotulo: 'Aguardando início', estados: ['PENDENTE', 'RESERVADA'], acoes: inicio },
-  { rotulo: 'Confecção', estados: ['CONFECCAO'], acoes: [['prova', 'Enviar para prova']] },
-  { rotulo: 'Em prova', estados: ['PROVA', 'EM_PROVA'], acoes: emProva },
-  { rotulo: 'Ajustes', estados: ['AJUSTES'], acoes: [['prova', 'Enviar para prova'], ['passadoria', 'Iniciar passadoria']] },
-  { rotulo: 'Passadoria', estados: ['PASSADORIA'], acoes: [['concluir', 'Concluir produção']] },
+  { rotulo: 'Aguardando início', estados: ['PENDENTE', 'RESERVADA'] },
+  { rotulo: 'Confecção', estados: ['CONFECCAO'] },
+  { rotulo: 'Em prova', estados: ['PROVA', 'EM_PROVA'] },
+  { rotulo: 'Ajustes', estados: ['AJUSTES'] },
+  { rotulo: 'Passadoria', estados: ['PASSADORIA'] },
 ];
 const dataHora = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -39,11 +38,8 @@ export default function FilaCosturaPage({ titulo }) {
     setAtualizando(ordem.id);
     setMensagem(null);
     try {
-      const { data } = await requisitarComCsrf('patch', '/ordens-servico/' + ordem.id + '/' + acao);
-      setFila((anterior) => ({
-        ...anterior,
-        ordens: anterior.ordens.map((item) => item.id === data.id ? data : item),
-      }));
+      await requisitarComCsrf('patch', '/ordens-servico/' + ordem.id + '/' + rotasDasAcoes[acao]);
+      setTentativa((anterior) => anterior + 1);
       setMensagem({ texto: 'Etapa atualizada para a ordem de ' + ordem.clienteNome + '.' });
     } catch (erro) {
       setMensagem({
@@ -96,11 +92,11 @@ export default function FilaCosturaPage({ titulo }) {
                     </div>)}
                   </dl>
                   <div className="fila-acoes">
-                    {etapa.acoes.filter(([acao]) => ordem.statusAtual !== 'PROVA' || acao !== 'passadoria')
-                      .map(([acao, rotulo]) => (
-                        <button key={acao} type="button" disabled={atualizando !== null}
-                          onClick={() => avancar(ordem, acao)}>{rotulo}</button>
-                      ))}
+                    {acoesDiretas(ordem).map((item) => (
+                      <button key={item.acao} type="button" disabled={atualizando !== null || !item.habilitada}
+                        title={item.motivoBloqueio ?? undefined}
+                        onClick={() => avancar(ordem, item.acao)}>{item.rotulo}</button>
+                    ))}
                   </div>
                 </li>
               );
