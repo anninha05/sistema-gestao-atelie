@@ -19,6 +19,8 @@ export default function UsuariosPage() {
       senha: formulario.get('senha'), perfil: formulario.get('perfil'),
     })}
     tituloDoItem={(usuario) => usuario.nome}
-    detalhesDoItem={(usuario) => [['E-mail', usuario.email], ['Perfil', perfis.find(([valor]) => valor === usuario.perfil)?.[1]]]}
+    subtituloDoItem={(usuario) => usuario.email}
+    etiquetaDoItem={(usuario) => [perfis.find(([valor]) => valor === usuario.perfil)?.[1] ?? usuario.perfil, 'rosa']}
+    detalhesDoItem={() => []}
   />;
 }

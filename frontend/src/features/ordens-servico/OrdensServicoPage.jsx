@@ -5,16 +5,7 @@ import Catalogo from '../../shared/Catalogo.jsx';
 import { Aviso, Selecao } from '../../shared/Interface.jsx';
 import AcoesDaOrdem from './AcoesDaOrdem.jsx';
 import PagamentosDaOrdem from './PagamentosDaOrdem.jsx';
-
-const tipos = { LOCACAO: 'Locação', SOB_MEDIDA: 'Sob medida' };
-const estados = {
-  PENDENTE: 'Pendente', RESERVADA: 'Reservada', CONFECCAO: 'Confecção',
-  PROVA: 'Prova', EM_PROVA: 'Em prova', AJUSTES: 'Ajustes', PASSADORIA: 'Passadoria',
-  CONCLUIDO: 'Concluída', RETIRADA: 'Retirada', ENTREGUE: 'Entregue',
-  CANCELADA: 'Cancelada', DEVOLVIDA: 'Devolvida',
-};
-const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-const dataHora = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+import { dataHora, estadoDaOrdem, moeda, tiposFluxo as tipos } from '../../shared/formatos.js';
 
 function formatarData(valor) {
   return valor ? dataHora.format(new Date(valor)) : null;
@@ -162,7 +153,7 @@ export default function OrdensServicoPage({ titulo }) {
       <Catalogo titulo={titulo} descricao="Abra ordens de locação ou sob medida e acompanhe seus registros."
         caminho="/ordens-servico" rotuloCadastro="Nova ordem de serviço" rotuloBusca="Buscar por cliente ou estado"
         cadastroDesabilitado={!podeCadastrar} abrirAoEntrar={estadoDaRota?.novaOrdem === true}
-        correspondeABusca={(ordem, busca) => [ordem.clienteNome, estados[ordem.statusAtual] ?? ordem.statusAtual]
+        correspondeABusca={(ordem, busca) => [ordem.clienteNome, estadoDaOrdem(ordem.statusAtual)[0]]
           .some((valor) => valor.toLocaleLowerCase('pt-BR').includes(busca.toLocaleLowerCase('pt-BR')))}
         campos={opcoes && <CamposDaOrdem {...opcoes} />}
         validar={validarOrdem}
@@ -185,13 +176,13 @@ export default function OrdensServicoPage({ titulo }) {
           })),
         })}
         tituloDoItem={(ordem) => ordem.clienteNome}
+        subtituloDoItem={(ordem) => tipos[ordem.tipoFluxo] ?? ordem.tipoFluxo}
+        etiquetaDoItem={(ordem) => estadoDaOrdem(ordem.statusAtual)}
         acoesDoItem={(ordem, aoAtualizar) => <>
           <AcoesDaOrdem ordem={ordem} aoAtualizar={aoAtualizar} />
-          <div className="fila-acoes"><PagamentosDaOrdem ordem={ordem} aoAtualizar={aoAtualizar} /></div>
+          <PagamentosDaOrdem ordem={ordem} aoAtualizar={aoAtualizar} />
         </>}
         detalhesDoItem={(ordem) => [
-          ['Tipo', tipos[ordem.tipoFluxo] ?? ordem.tipoFluxo],
-          ['Estado', estados[ordem.statusAtual] ?? ordem.statusAtual],
           ['Peças', ordem.itens?.map((registro) => nomesDasPecas.get(registro.pecaId) ?? registro.pecaId).join(', ') || '—'],
           ['Total', moeda.format(ordem.valorTotal)],
           ...(ordem.inicioLocacao ? [['Início da locação', formatarData(ordem.inicioLocacao)],
