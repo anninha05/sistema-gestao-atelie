@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8081',
+        target: 'http://127.0.0.1:8080',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
@@ -16,7 +16,7 @@ export default defineConfig({
     allowedHosts: ['anna-win11.tailae599f.ts.net'],
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8081',
+        target: 'http://127.0.0.1:8080',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
