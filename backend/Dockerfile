@@ -1,4 +1,5 @@
 FROM eclipse-temurin:21-jdk-alpine AS build
+ENV TZ=America/Sao_Paulo
 WORKDIR /app
 COPY mvnw .
 RUN chmod +x mvnw
