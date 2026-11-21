@@ -4,11 +4,6 @@ import { api, requisitarComCsrf } from '../../shared/api.js';
 
 const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const percentual = (valor) => new Intl.NumberFormat('pt-BR', { style: 'percent', maximumFractionDigits: 2 }).format(valor || 0);
-const camposPoliticaVazios = {
-  ganhoProporcional: '', ganhoIntegral: '', ganhoDerivativo: '', ajusteMinimo: '', ajusteMaximo: '',
-  descontoFidelidade: '', quantidadeOsFidelidade: '',
-};
-
 function mensagemDaFalha(falha, fallback) {
   return falha.response?.data?.mensagem || fallback;
 }
@@ -24,7 +19,10 @@ function valorCampo(valor) {
 export default function PrecificacaoPID({ mes }) {
   const [meta, setMeta] = useState(null);
   const [valorMeta, setValorMeta] = useState('');
-  const [politica, setPolitica] = useState(camposPoliticaVazios);
+  const [pisoCadastrado, setPisoCadastrado] = useState(null);
+  const [carregandoPiso, setCarregandoPiso] = useState(false);
+  const [editandoPiso, setEditandoPiso] = useState(false);
+  const [indicadores, setIndicadores] = useState(null);
   const [ordens, setOrdens] = useState([]);
   const [ordemId, setOrdemId] = useState('');
   const [pisoMinimo, setPisoMinimo] = useState('');
@@ -34,6 +32,8 @@ export default function PrecificacaoPID({ mes }) {
   const [confirmacaoAberta, setConfirmacaoAberta] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
+  const [erroMeta, setErroMeta] = useState('');
+  const [erroPiso, setErroPiso] = useState('');
   const [sucesso, setSucesso] = useState('');
   const [operacao, setOperacao] = useState('');
 
@@ -41,35 +41,25 @@ export default function PrecificacaoPID({ mes }) {
     `${ordem.clienteNome} · ${ordem.tipoFluxo === 'LOCACAO' ? 'Locação' : 'Sob medida'} · ${moeda.format(ordem.valorTotal)}`,
   ]), [ordens]);
 
-  async function carregarHistorico(mesSelecionado = mes) {
-    const { data } = await api.get('/precificacao/atualizacoes', { params: { mes: mesSelecionado } });
-    setExecucoes(data);
-  }
-
   useEffect(() => {
     let ativa = true;
     setCarregando(true);
     setErro('');
+    limparResultado();
+    setConfirmacaoAberta(false);
     Promise.all([
       api.get('/precificacao/metas/' + mes).catch((falha) => {
         if (falha.response?.status === 404) return { data: null };
         throw falha;
       }),
-      api.get('/precificacao/politica').catch((falha) => {
-        if (falha.response?.status === 404) return { data: null };
-        throw falha;
-      }),
       api.get('/precificacao/atualizacoes', { params: { mes } }),
       api.get('/ordens-servico'),
-    ]).then(([respostaMeta, respostaPolitica, respostaExecucoes, respostaOrdens]) => {
+      api.get('/financeiro/indicadores', { params: { mes } }),
+    ]).then(([respostaMeta, respostaExecucoes, respostaOrdens, respostaIndicadores]) => {
       if (!ativa) return;
       setMeta(respostaMeta.data);
       setValorMeta(valorCampo(respostaMeta.data?.valorMeta));
-      if (respostaPolitica.data) {
-        setPolitica(Object.fromEntries(Object.keys(camposPoliticaVazios).map((campo) => [
-          campo, valorCampo(respostaPolitica.data[campo]),
-        ])));
-      }
+      setIndicadores(respostaIndicadores.data);
       setExecucoes(respostaExecucoes.data);
       setOrdens(respostaOrdens.data.filter((ordem) => ordem.statusAtual === 'RESERVADA'));
     }).catch((falha) => {
@@ -77,6 +67,42 @@ export default function PrecificacaoPID({ mes }) {
     }).finally(() => { if (ativa) setCarregando(false); });
     return () => { ativa = false; };
   }, [mes]);
+
+  useEffect(() => {
+    let ativa = true;
+    setPisoCadastrado(null);
+    setPisoMinimo('');
+    setEditandoPiso(false);
+    setErroPiso('');
+    if (!ordemId) return;
+    setCarregandoPiso(true);
+    api.get('/precificacao/ordens/' + ordemId + '/preco-minimo')
+      .then(({ data }) => {
+        if (!ativa) return;
+        setPisoCadastrado(data.valor);
+        setPisoMinimo(String(data.valor));
+      })
+      .catch((falha) => {
+        if (!ativa) return;
+        if (falha.response?.status === 404) setEditandoPiso(true);
+        else setErroPiso(mensagemDaFalha(falha, 'Não foi possível consultar o preço mínimo.'));
+      })
+      .finally(() => { if (ativa) setCarregandoPiso(false); });
+    return () => { ativa = false; };
+  }, [ordemId]);
+
+  async function salvarPiso() {
+    setOperacao('piso'); setErroPiso(''); limparResultado();
+    try {
+      const { data } = await requisitarComCsrf('put', '/precificacao/ordens/' + ordemId + '/preco-minimo', {
+        valor: pisoMinimo === '' ? null : Number(pisoMinimo),
+      });
+      setPisoCadastrado(data.valor);
+      setEditandoPiso(false);
+      setSucesso('Preço mínimo cadastrado. Agora consulte a sugestão.');
+    } catch (falha) { setErroPiso(mensagemDaFalha(falha, 'Não foi possível salvar o preço mínimo.')); }
+    finally { setOperacao(''); }
+  }
 
   function limparResultado() {
     setCalculo(null);
@@ -87,56 +113,15 @@ export default function PrecificacaoPID({ mes }) {
   async function salvarMeta(evento) {
     evento.preventDefault();
     const aviso = validarCampos(evento.currentTarget);
-    if (aviso) { setErro(aviso); return; }
-    setOperacao('meta'); setErro(''); setSucesso('');
+    if (aviso) { setErroMeta(aviso); return; }
+    setOperacao('meta'); setErro(''); setErroMeta(''); setSucesso('');
     try {
       const { data } = await requisitarComCsrf('put', '/precificacao/metas/' + mes, {
         valorMeta: Number(valorMeta), indicador: 'RESULTADO_DE_CAIXA',
       });
       setMeta(data);
       setSucesso(`Meta de ${moeda.format(data.valorMeta)} salva para ${mes}.`);
-    } catch (falha) { setErro(mensagemDaFalha(falha, 'Não foi possível salvar a meta mensal.')); }
-    finally { setOperacao(''); }
-  }
-
-  async function salvarPolitica(evento) {
-    evento.preventDefault();
-    const aviso = validarCampos(evento.currentTarget);
-    if (aviso) { setErro(aviso); return; }
-    const desconto = politica.descontoFidelidade === '' ? null : Number(politica.descontoFidelidade) / 100;
-    const quantidade = politica.quantidadeOsFidelidade === '' ? null : Number(politica.quantidadeOsFidelidade);
-    if ((desconto == null) !== (quantidade == null)) {
-      setErro('Preencha juntos o desconto de fidelidade e a quantidade mínima de ordens concluídas, ou deixe os dois vazios.');
-      return;
-    }
-    setOperacao('politica'); setErro(''); setSucesso('');
-    try {
-      const { data } = await requisitarComCsrf('put', '/precificacao/politica', {
-        ganhoProporcional: Number(politica.ganhoProporcional),
-        ganhoIntegral: Number(politica.ganhoIntegral),
-        ganhoDerivativo: Number(politica.ganhoDerivativo),
-        ajusteMinimo: Number(politica.ajusteMinimo) / 100,
-        ajusteMaximo: Number(politica.ajusteMaximo) / 100,
-        descontoFidelidade: desconto,
-        quantidadeOsFidelidade: quantidade,
-      });
-      setPolitica(Object.fromEntries(Object.keys(camposPoliticaVazios).map((campo) => [campo, valorCampo(
-        campo === 'ajusteMinimo' || campo === 'ajusteMaximo' ? data[campo] * 100
-          : campo === 'descontoFidelidade' ? data[campo] == null ? '' : data[campo] * 100 : data[campo],
-      )])));
-      limparResultado();
-      setSucesso('Política de precificação salva. Ela será utilizada nas próximas atualizações e sugestões.');
-    } catch (falha) { setErro(mensagemDaFalha(falha, 'Não foi possível salvar a política de precificação.')); }
-    finally { setOperacao(''); }
-  }
-
-  async function atualizarIndicador() {
-    setOperacao('pid'); setErro(''); setSucesso('');
-    try {
-      const { data } = await requisitarComCsrf('post', '/precificacao/atualizacao-diaria');
-      await carregarHistorico();
-      setSucesso(`Atualização de ${data.dataApuracao} registrada. Ajuste PID: ${percentual(data.ajusteLimitado)}.`);
-    } catch (falha) { setErro(mensagemDaFalha(falha, 'Não foi possível atualizar o indicador diário.')); }
+    } catch (falha) { setErroMeta(mensagemDaFalha(falha, 'Não foi possível salvar a meta mensal.')); }
     finally { setOperacao(''); }
   }
 
@@ -145,26 +130,15 @@ export default function PrecificacaoPID({ mes }) {
     if (!ordemId) { setErro('Selecione uma ordem reservada para simular o preço.'); return; }
     const aviso = validarCampos(evento.currentTarget);
     if (aviso) { setErro(aviso); return; }
-    setOperacao('simular'); setErro(''); setSucesso(''); setSugestao(null);
-    try {
-      const { data } = await requisitarComCsrf('post', '/precificacao/simular', {
-        ordemServicoId: ordemId, pisoMinimo: Number(pisoMinimo),
-      });
-      setCalculo(data);
-    } catch (falha) { setErro(mensagemDaFalha(falha, 'Não foi possível simular a sugestão de preço.')); }
-    finally { setOperacao(''); }
-  }
-
-  async function registrarSugestao() {
-    setOperacao('sugestao'); setErro(''); setSucesso('');
+    setOperacao('simular'); setErro(''); setSucesso(''); setSugestao(null); setCalculo(null);
     try {
       const { data } = await requisitarComCsrf('post', '/precificacao/sugestoes', {
-        ordemServicoId: ordemId, pisoMinimo: Number(pisoMinimo),
+        ordemServicoId: ordemId,
       });
-      setSugestao(data);
       setCalculo(data);
-      setSucesso('Sugestão registrada. O preço contratado continua inalterado até uma aprovação explícita.');
-    } catch (falha) { setErro(mensagemDaFalha(falha, 'Não foi possível registrar a sugestão.')); }
+      setSugestao(data);
+      api.get('/precificacao/atualizacoes', { params: { mes } }).then(({ data: historico }) => setExecucoes(historico)).catch(() => {});
+    } catch (falha) { setErro(mensagemDaFalha(falha, 'Não foi possível simular a sugestão de preço.')); }
     finally { setOperacao(''); }
   }
 
@@ -181,22 +155,19 @@ export default function PrecificacaoPID({ mes }) {
         ? { ...ordem, valorTotal: data.valorAprovado } : ordem));
       setSugestao(null);
       setCalculo(null);
-      setPisoMinimo('');
+
     } catch (falha) { setErro(mensagemDaFalha(falha, 'Não foi possível aprovar a sugestão.')); }
     finally { setOperacao(''); }
   }
 
   const ultimaExecucao = execucoes[0];
+  const ordemSelecionada = ordens.find((ordem) => ordem.id === ordemId);
 
   return (
     <section className="pid-modulo" aria-labelledby="titulo-pid">
       <div className="pid-cabecalho">
-        <div><span className="eyebrow">Gerência</span><h2 id="titulo-pid">Metas e precificação assistida</h2>
-          <p>Configure a meta financeira, acompanhe o controlador PID e avalie sugestões antes de alterar uma ordem.</p></div>
-        <button type="button" className="botao-secundario" onClick={atualizarIndicador}
-          disabled={carregando || operacao !== '' || !meta || !politica.ganhoProporcional}>
-          {operacao === 'pid' ? 'Atualizando…' : 'Atualizar indicador do dia'}
-        </button>
+        <div><span className="eyebrow">Gerência</span><h2 id="titulo-pid">Meta e sugestão de preço</h2>
+          <p>Defina o resultado que deseja alcançar e avalie sugestões de preço para suas contratações.</p></div>
       </div>
 
       {erro && <Aviso>{erro}</Aviso>}
@@ -206,96 +177,110 @@ export default function PrecificacaoPID({ mes }) {
       {!carregando && <>
         <div className="pid-cartoes-configuracao">
           <form className="pid-cartao" onSubmit={salvarMeta} noValidate aria-busy={operacao === 'meta'}>
-            <h3>Meta mensal de caixa</h3>
+            <h3>1. Defina a meta do mês</h3>
+            {erroMeta && <Aviso>{erroMeta}</Aviso>}
             <p>A meta é comparada ao resultado de caixa acumulado no mês selecionado acima.</p>
             {meta && <p className="pid-detalhe">Última configuração: {meta.responsavelNome}</p>}
             <label>Valor da meta (R$)<input type="number" min="0.01" max="99999999.99" step="0.01"
-              required value={valorMeta} onChange={(evento) => setValorMeta(evento.target.value)} /></label>
+              required value={valorMeta} onChange={(evento) => { setValorMeta(evento.target.value); setErroMeta(''); }} /></label>
             <button type="submit" disabled={operacao !== ''}>{operacao === 'meta' ? 'Salvando…' : 'Salvar meta'}</button>
           </form>
 
-          <form className="pid-cartao" onSubmit={salvarPolitica} noValidate aria-busy={operacao === 'politica'}>
-            <h3>Política do controlador</h3>
-            <p>Os ganhos e limites são definidos pela gerência; o sistema não preenche valores comerciais por conta própria.</p>
-            <div className="pid-campos">
-              <label>Ganho proporcional (Kp)<input type="number" step="any" required value={politica.ganhoProporcional}
-                onChange={(evento) => setPolitica({ ...politica, ganhoProporcional: evento.target.value })} /></label>
-              <label>Ganho integral (Ki)<input type="number" step="any" required value={politica.ganhoIntegral}
-                onChange={(evento) => setPolitica({ ...politica, ganhoIntegral: evento.target.value })} /></label>
-              <label>Ganho derivativo (Kd)<input type="number" step="any" required value={politica.ganhoDerivativo}
-                onChange={(evento) => setPolitica({ ...politica, ganhoDerivativo: evento.target.value })} /></label>
-              <label>Ajuste mínimo (%)<input type="number" step="any" required value={politica.ajusteMinimo}
-                onChange={(evento) => setPolitica({ ...politica, ajusteMinimo: evento.target.value })} /></label>
-              <label>Ajuste máximo (%)<input type="number" step="any" required value={politica.ajusteMaximo}
-                onChange={(evento) => setPolitica({ ...politica, ajusteMaximo: evento.target.value })} /></label>
-              <label>Desconto de fidelidade (%)<input type="number" min="0" max="99.99" step="0.01"
-                value={politica.descontoFidelidade} onChange={(evento) => setPolitica({ ...politica, descontoFidelidade: evento.target.value })} /></label>
-              <label>Ordens concluídas para fidelidade<input type="number" min="1" step="1"
-                value={politica.quantidadeOsFidelidade} onChange={(evento) => setPolitica({ ...politica, quantidadeOsFidelidade: evento.target.value })} /></label>
-            </div>
-            <button type="submit" disabled={operacao !== ''}>{operacao === 'politica' ? 'Salvando…' : 'Salvar política'}</button>
-          </form>
+          <div className="pid-cartao">
+            <h3>Como está sua meta?</h3>
+            {meta && indicadores ? <>
+              <p>Você definiu {moeda.format(meta.valorMeta)} para este mês.</p>
+              <dl className="pid-memoria">
+                <div><dt>Resultado de caixa até agora</dt><dd>{moeda.format(indicadores.resultadoDeCaixa)}</dd></div>
+                <div><dt>Falta para alcançar a meta</dt><dd>{moeda.format(Math.max(0, meta.valorMeta - indicadores.resultadoDeCaixa))}</dd></div>
+              </dl>
+              <progress className="pid-progresso" aria-label="Progresso da meta mensal"
+                max="100" value={Math.max(0, Math.min(100, indicadores.resultadoDeCaixa / meta.valorMeta * 100))} />
+              <p>{indicadores.resultadoDeCaixa >= meta.valorMeta ? 'Meta alcançada!' : 'Acompanhe seus recebimentos e despesas para observar a evolução.'}</p>
+            </> : <p>Salve uma meta para acompanhar seu progresso neste mês.</p>}
+          </div>
         </div>
 
-        <div className="pid-cartao pid-historico">
-          <div className="pid-subcabecalho"><div><h3>Execução diária</h3>
-            <p>Uma atualização por dia para a competência {mes}. Repetir a ação no mesmo dia não duplica o cálculo.</p></div>
+        <details className="pid-cartao pid-historico">
+          <summary>Consultar acompanhamento diário</summary>
+          <div className="pid-subcabecalho"><div><h3>Recomendações de preço</h3>
+            <p>O sistema atualiza as recomendações diariamente, quando há meta e configuração técnica disponíveis.</p></div>
             <span className="pid-contador">{execucoes.length} {execucoes.length === 1 ? 'registro' : 'registros'}</span>
           </div>
-          {!ultimaExecucao ? <p className="pid-vazio">Nenhuma atualização registrada para este mês.</p> : (
+          {!ultimaExecucao ? <p className="pid-vazio">Ainda não há recomendação calculada para este mês.</p> : (
             <div className="pid-indicadores">
               <div><span>Apuração</span><strong>{dataLocal(ultimaExecucao.dataApuracao)}</strong></div>
               <div><span>Resultado realizado</span><strong>{moeda.format(ultimaExecucao.resultadoRealizado)}</strong></div>
-              <div><span>Meta acumulada</span><strong>{moeda.format(ultimaExecucao.referenciaAcumulada)}</strong></div>
-              <div><span>Erro normalizado</span><strong>{percentual(ultimaExecucao.erroNormalizado)}</strong></div>
-              <div><span>Ajuste limitado</span><strong>{percentual(ultimaExecucao.ajusteLimitado)}</strong></div>
+              <div><span>Resultado esperado até a apuração</span><strong>{moeda.format(ultimaExecucao.referenciaAcumulada)}</strong></div>
+
+              <div><span>Ajuste recomendado</span><strong>{percentual(ultimaExecucao.ajusteLimitado)}</strong></div>
               <div><span>Responsável</span><strong>{ultimaExecucao.responsavelNome}</strong></div>
             </div>
           )}
-          <p className="pid-observacao">Ajuste PID é uma recomendação matemática baseada no resultado de caixa; não prevê demanda nem garante aumento de lucro.</p>
-        </div>
+          <p className="pid-observacao">As sugestões consideram o resultado de caixa e o histórico do cliente. Você decide se deseja aplicar o preço.</p>
+        </details>
 
         <div className="pid-cartao pid-simulacao">
-          <h3>Simular preço para uma ordem reservada</h3>
-          <p>A simulação não altera a ordem nem cria recebimentos. O piso deve ser informado pela gerência com base nos custos e na margem definida pelo ateliê.</p>
+          <h3>2. Escolha a OS e consulte o preço sugerido</h3>
+          <p>Escolha uma OS, confira a sugestão e confirme apenas se quiser aplicar o novo preço.</p>
           {!opcoesDeOrdens.length && <Aviso tipo="info">Não há ordens reservadas disponíveis para simulação.</Aviso>}
-          <form className="pid-form-simulacao" onSubmit={simular} noValidate>
+          <form onSubmit={simular} noValidate>
+          <fieldset className="pid-form-simulacao" disabled={operacao !== ''}>
             <Selecao rotulo="Ordem de serviço" valor={ordemId} aoSelecionar={(novoId) => {
               setOrdemId(novoId); limparResultado();
-            }} opcoes={opcoesDeOrdens} textoInicial="Pesquise uma ordem reservada" pesquisar />
-            <label>Piso mínimo informado pela gerência (R$)<input type="number" min="0.01" max="99999999.99" step="0.01"
-              required value={pisoMinimo} onChange={(evento) => { setPisoMinimo(evento.target.value); limparResultado(); }} /></label>
-            <button type="submit" disabled={!ordens.length || operacao !== ''}>{operacao === 'simular' ? 'Calculando…' : 'Simular preço'}</button>
-          </form>
+            }} opcoes={opcoesDeOrdens} textoInicial="Pesquise uma ordem reservada" pesquisar="Pesquisar por cliente" />
+            <button type="submit" disabled={!ordemId || !meta || pisoCadastrado == null || editandoPiso || carregandoPiso || operacao !== ''}>{operacao === 'simular' ? 'Calculando…' : 'Consultar sugestão'}</button>
+          </fieldset></form>
+          {erroPiso && <Aviso>{erroPiso}</Aviso>}
+          {carregandoPiso && <p role="status">Consultando preço mínimo…</p>}
+          {ordemSelecionada && !carregandoPiso && <div className="pid-piso">
+            {editandoPiso ? <>
+              <label>Preço mínimo desta OS (R$)<input type="number" min="0.01" max="99999999.99" step="0.01"
+                value={pisoMinimo} disabled={operacao !== ''} onChange={(evento) => { setPisoMinimo(evento.target.value); limparResultado(); }} /></label>
+              <p>Cadastre uma vez o menor valor que cobre seus custos e a margem desejada. As sugestões respeitarão esse mínimo.</p>
+              <button type="button" className="botao-secundario" onClick={salvarPiso} disabled={operacao !== ''}>
+                {operacao === 'piso' ? 'Salvando…' : 'Salvar preço mínimo'}
+              </button>
+            </> : pisoCadastrado != null && <>
+              <p>Preço mínimo cadastrado: <strong>{moeda.format(pisoCadastrado)}</strong>.</p>
+              <button type="button" className="botao-secundario" disabled={operacao !== ''} onClick={() => { setEditandoPiso(true); limparResultado(); }}>Alterar mínimo</button>
+            </>}
+          </div>}
+          {!meta && <Aviso tipo="info">Salve a meta do mês antes de consultar uma sugestão.</Aviso>}
+          {ordemSelecionada && !calculo && <p>Preço atual de <strong>{ordemSelecionada.clienteNome}</strong>: <strong>{moeda.format(ordemSelecionada.valorTotal)}</strong>.</p>}
           {calculo && <div className="pid-resultado" aria-live="polite">
             <div className="pid-resultado-topo"><div><span>Preço sugerido</span><strong>{moeda.format(calculo.precoSugerido)}</strong></div>
-              <span className={sugestao ? 'pid-etiqueta registrada' : 'pid-etiqueta'}>{sugestao ? 'Registrada para aprovação' : 'Simulação'}</span></div>
+              <span className={sugestao ? 'pid-etiqueta registrada' : 'pid-etiqueta'}>{sugestao ? 'Aguardando sua decisão' : 'Simulação'}</span></div>
+            <p>Preço atual: <strong>{moeda.format(calculo.precoBase)}</strong>. O preço sugerido só será aplicado depois da sua confirmação.</p>
+            <details><summary>Por que este preço?</summary>
             <dl className="pid-memoria">
               <div><dt>Preço-base atual</dt><dd>{moeda.format(calculo.precoBase)}</dd></div>
-              <div><dt>Ajuste PID</dt><dd>{percentual(calculo.ajustePid)}</dd></div>
+              <div><dt>Ajuste recomendado</dt><dd>{percentual(calculo.ajustePid)}</dd></div>
               <div><dt>Após ajuste</dt><dd>{moeda.format(calculo.precoAjustado)}</dd></div>
               <div><dt>Fidelidade</dt><dd>{calculo.elegivelFidelidade ? percentual(calculo.descontoFidelidade) : 'Não aplicado'}</dd></div>
               <div><dt>Após fidelidade</dt><dd>{moeda.format(calculo.precoAposFidelidade)}</dd></div>
               <div><dt>Piso informado</dt><dd>{moeda.format(calculo.pisoMinimo)}</dd></div>
               <div><dt>Histórico cancelado</dt><dd>{calculo.ordensCanceladas} ordem(ns)</dd></div>
             </dl>
-            <p>{calculo.justificativa}</p>
-            {sugestao ? <button type="button" onClick={() => setConfirmacaoAberta(true)} disabled={operacao !== ''}>
-              {operacao === 'aprovar' ? 'Aplicando…' : 'Aprovar e aplicar novo preço'}
-            </button> : <button type="button" className="botao-secundario" onClick={registrarSugestao} disabled={operacao !== ''}>
-              {operacao === 'sugestao' ? 'Registrando…' : 'Registrar sugestão'}
-            </button>}
+            <p>{calculo.justificativa}</p></details>
+            <div className="modal-acoes">
+              <button type="button" className="botao-secundario" onClick={limparResultado} disabled={operacao !== ''}>Manter preço atual</button>
+              <button type="button" onClick={() => setConfirmacaoAberta(true)} disabled={!sugestao || operacao !== ''}>
+                {operacao === 'aprovar' ? 'Aplicando…' : 'Usar este preço'}
+              </button>
+            </div>
           </div>}
         </div>
       </>}
 
-      {confirmacaoAberta && sugestao && <Modal titulo="Aprovar novo preço" aoFechar={() => setConfirmacaoAberta(false)} ocupado={operacao === 'aprovar'}>
+      {confirmacaoAberta && sugestao && <Modal titulo="Confirmar preço da OS" aoFechar={() => setConfirmacaoAberta(false)} ocupado={operacao === 'aprovar'}>
+        {erro && <Aviso>{erro}</Aviso>}
         <p>O valor total da ordem será alterado de <strong>{moeda.format(sugestao.precoBase)}</strong> para <strong>{moeda.format(sugestao.precoSugerido)}</strong>.</p>
         <p>O histórico de recebimentos será preservado e o saldo será recalculado. Esta ação será registrada em auditoria.</p>
         <div className="modal-acoes">
           <button type="button" className="botao-secundario" onClick={() => setConfirmacaoAberta(false)} disabled={operacao === 'aprovar'}>Voltar</button>
           <button type="button" onClick={aprovarSugestao} disabled={operacao === 'aprovar'}>
-            {operacao === 'aprovar' ? 'Aprovando…' : 'Confirmar aprovação'}
+            {operacao === 'aprovar' ? 'Aprovando…' : 'Confirmar preço'}
           </button>
         </div>
       </Modal>}

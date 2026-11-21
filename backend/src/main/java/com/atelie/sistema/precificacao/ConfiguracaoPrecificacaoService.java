@@ -8,6 +8,11 @@ import com.atelie.sistema.shared.exception.RecursoNaoEncontradoException;
 import com.atelie.sistema.usuario.Usuario;
 import com.atelie.sistema.usuario.UsuarioRepository;
 import java.time.YearMonth;
+import java.math.BigDecimal;
+import java.util.UUID;
+import com.atelie.sistema.ordemservico.OrdemServicoRepository;
+import com.atelie.sistema.ordemservico.state.StatusOrdemServico;
+import com.atelie.sistema.shared.exception.RegraNegocioException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,12 +21,17 @@ class ConfiguracaoPrecificacaoService {
     private final MetaMensalRepository metas;
     private final PoliticaPrecificacaoRepository politicas;
     private final UsuarioRepository usuarios;
+    private final OrdemServicoRepository ordens;
+    private final PisoPrecoOrdemRepository pisos;
 
     ConfiguracaoPrecificacaoService(MetaMensalRepository metas, PoliticaPrecificacaoRepository politicas,
-            UsuarioRepository usuarios) {
+            UsuarioRepository usuarios, OrdemServicoRepository ordens,
+            PisoPrecoOrdemRepository pisos) {
         this.metas = metas;
         this.politicas = politicas;
         this.usuarios = usuarios;
+        this.ordens = ordens;
+        this.pisos = pisos;
     }
 
     @Transactional(readOnly = true)
@@ -34,6 +44,17 @@ class ConfiguracaoPrecificacaoService {
     @Transactional
     MetaMensalResponse definirMeta(YearMonth mes, MetaMensalRequest request, String emailResponsavel) {
         Usuario responsavel = buscarResponsavel(emailResponsavel);
+        if (!politicas.existsById(PoliticaPrecificacao.ID_UNICA)) {
+            // Perfil técnico inicial para demonstração, sujeito à calibração.
+            // O limite comercial de 20% foi definido para o fluxo simplificado.
+            politicas.save(new PoliticaPrecificacao(0.2, 0.01, 0.05, -0.20, 0.20, null, null, responsavel));
+        } else {
+            var politica = politicas.findById(PoliticaPrecificacao.ID_UNICA).orElseThrow();
+            politica.configurar(politica.getGanhoProporcional(), politica.getGanhoIntegral(),
+                    politica.getGanhoDerivativo(), -0.20, 0.20, politica.getDescontoFidelidade(),
+                    politica.getQuantidadeOsFidelidade(), responsavel);
+        }
+
         MetaMensal meta = metas.buscarPorMes(mes.atDay(1)).orElseGet(() ->
                 new MetaMensal(mes, request.valorMeta(), request.indicador(), responsavel));
         meta.alterar(request.valorMeta(), request.indicador(), responsavel);
@@ -57,6 +78,21 @@ class ConfiguracaoPrecificacaoService {
                 request.ajusteMinimo(), request.ajusteMaximo(), request.descontoFidelidade(),
                 request.quantidadeOsFidelidade(), responsavel);
         return resposta(politicas.save(politica));
+    }
+
+    @Transactional(readOnly = true)
+    BigDecimal buscarPiso(UUID ordemId) {
+        return pisos.findById(ordemId).map(PisoPrecoOrdem::getValor).orElseThrow(() ->
+                new RecursoNaoEncontradoException("Cadastre o preço mínimo desta ordem antes de consultar sugestões."));
+    }
+
+    @Transactional
+    BigDecimal salvarPiso(UUID ordemId, BigDecimal valor, String email) {
+        var ordem = ordens.buscarParaAtualizacao(ordemId).orElseThrow(() ->
+                new RecursoNaoEncontradoException("Ordem de serviço não encontrada."));
+        if (ordem.getStatusAtual() != StatusOrdemServico.RESERVADA)
+            throw new RegraNegocioException("O preço mínimo só pode ser configurado em uma ordem reservada.");
+        return pisos.save(new PisoPrecoOrdem(ordemId, valor, buscarResponsavel(email))).getValor();
     }
 
     private Usuario buscarResponsavel(String email) {

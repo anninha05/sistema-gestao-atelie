@@ -46,6 +46,14 @@ class AtualizacaoDiariaPIDService {
     }
 
     @Transactional
+    public void atualizarAutomaticamente() {
+        // A meta identifica quem autorizou o acompanhamento; não há usuário fictício para a rotina.
+        var meta = metas.buscarPorMes(YearMonth.now().atDay(1));
+        if (meta.isEmpty() || !politicas.existsById(PoliticaPrecificacao.ID_UNICA)) return;
+        atualizar(LocalDate.now(), meta.get().getResponsavel().getEmail());
+    }
+
+    @Transactional
     ExecucaoPIDResponse atualizar(LocalDate data, String emailResponsavel) {
         if (data == null || data.isAfter(LocalDate.now()))
             throw new RegraNegocioException("A atualização diária só pode ser executada para hoje ou para uma data passada.");

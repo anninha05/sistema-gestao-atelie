@@ -23,16 +23,18 @@ class AgentePrecificacaoService {
     private final SugestaoPrecoRepository sugestoes;
     private final UsuarioRepository usuarios;
     private final CalculadoraSugestaoPreco calculadora;
+    private final PisoPrecoOrdemRepository pisos;
 
     AgentePrecificacaoService(OrdemServicoRepository ordens, ExecucaoPIDDiariaRepository execucoes,
             PoliticaPrecificacaoRepository politicas, SugestaoPrecoRepository sugestoes,
-            UsuarioRepository usuarios, CalculadoraSugestaoPreco calculadora) {
+            UsuarioRepository usuarios, CalculadoraSugestaoPreco calculadora, PisoPrecoOrdemRepository pisos) {
         this.ordens = ordens;
         this.execucoes = execucoes;
         this.politicas = politicas;
         this.sugestoes = sugestoes;
         this.usuarios = usuarios;
         this.calculadora = calculadora;
+        this.pisos = pisos;
     }
 
     @Transactional(readOnly = true)
@@ -72,9 +74,13 @@ class AgentePrecificacaoService {
         int concluidas = (int) historico.stream().filter(os -> os.getStatusAtual() == StatusOrdemServico.ENTREGUE
                 || os.getStatusAtual() == StatusOrdemServico.DEVOLVIDA).count();
         int canceladas = (int) historico.stream().filter(os -> os.getStatusAtual() == StatusOrdemServico.CANCELADA).count();
+        var pisoCadastrado = pisos.findById(ordem.getId()).map(PisoPrecoOrdem::getValor).orElse(null);
+        var piso = request.pisoMinimo() == null ? pisoCadastrado : request.pisoMinimo();
+        if (pisoCadastrado != null && piso != null && piso.compareTo(pisoCadastrado) < 0)
+            throw new RegraNegocioException("A sugestão deve respeitar o preço mínimo cadastrado para a ordem.");
         CalculoSugestaoPreco calculo = calculadora.calcular(ordem.getValorTotal(), ajuste,
                 politica.getDescontoFidelidade(), politica.getQuantidadeOsFidelidade(), concluidas, canceladas,
-                request.pisoMinimo());
+                piso, politica.getAjusteMinimo(), politica.getAjusteMaximo());
         if (!persistir) return resposta(null, ordem.getId(), ordem.getCliente().getId(), execucao, calculo, responsavel, null);
 
         SugestaoPreco sugestao = sugestoes.save(new SugestaoPreco(ordem.getId(), ordem.getCliente().getId(),

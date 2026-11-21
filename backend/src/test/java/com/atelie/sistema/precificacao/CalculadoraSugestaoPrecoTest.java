@@ -10,6 +10,16 @@ class CalculadoraSugestaoPrecoTest {
     private final CalculadoraSugestaoPreco calculadora = new CalculadoraSugestaoPreco();
 
     @Test
+    void limitaReducaoTotalIncluindoFidelidadeERejeitaMinimoAcimaDoTeto() {
+        var calculadora = new CalculadoraSugestaoPreco();
+        var resultado = calculadora.calcular(new BigDecimal("150"), -0.2, new BigDecimal("0.1"),
+                1, 3, 0, new BigDecimal("100"), -0.2, 0.2);
+        assertEquals(new BigDecimal("120.00"), resultado.precoSugerido());
+        assertThrows(RegraNegocioException.class, () -> calculadora.calcular(new BigDecimal("150"),
+                0.1, null, null, 0, 0, new BigDecimal("200"), -0.2, 0.2));
+    }
+
+    @Test
     void aplicaPidFidelidadeEPisoNaOrdemDefinida() {
         var calculo = calculadora.calcular(new BigDecimal("100.00"), 0.10, new BigDecimal("0.10"),
                 3, 4, 1, new BigDecimal("105.00"));

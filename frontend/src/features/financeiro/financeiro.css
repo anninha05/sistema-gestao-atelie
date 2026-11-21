@@ -72,3 +72,13 @@
   .pid-cabecalho, .pid-subcabecalho { align-items: stretch; flex-direction: column; }
   .pid-cartao .pid-campos { grid-template-columns: minmax(0, 1fr); }
 }
+
+.pid-progresso { width: 100%; accent-color: var(--accent); height: .8rem; }
+.pid-resultado summary { cursor: pointer; padding-block: .75rem; color: #71334c; }
+
+fieldset.pid-form-simulacao { border: 0; margin: 0; padding: 0; min-width: 0; }
+.pid-historico > summary { cursor: pointer; color: #71334c; font-weight: 650; }
+
+.pid-form-simulacao { grid-template-columns: minmax(0, 1fr) auto; }
+.pid-piso { padding: 1rem; border: 1px solid #e9d2dd; border-radius: .7rem; }
+@media (max-width: 760px) { .pid-form-simulacao { grid-template-columns: minmax(0, 1fr); } }

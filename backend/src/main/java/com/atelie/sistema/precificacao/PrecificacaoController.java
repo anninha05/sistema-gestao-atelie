@@ -40,7 +40,20 @@ class PrecificacaoController {
     @PutMapping("/metas/{mes}")
     MetaMensalResponse definirMeta(@PathVariable YearMonth mes, @RequestBody MetaMensalRequest request,
             Authentication autenticacao) {
-        return configuracao.definirMeta(mes, request, autenticacao.getName());
+        var meta = configuracao.definirMeta(mes, request, autenticacao.getName());
+        if (mes.equals(YearMonth.now())) atualizacoes.atualizarAutomaticamente();
+        return meta;
+    }
+
+    @GetMapping("/ordens/{id}/preco-minimo")
+    java.util.Map<String, java.math.BigDecimal> buscarPiso(@PathVariable java.util.UUID id) {
+        return java.util.Map.of("valor", configuracao.buscarPiso(id));
+    }
+
+    @PutMapping("/ordens/{id}/preco-minimo")
+    java.util.Map<String, java.math.BigDecimal> salvarPiso(@PathVariable java.util.UUID id,
+            @RequestBody com.atelie.sistema.precificacao.dto.PisoPrecoRequest request, Authentication autenticacao) {
+        return java.util.Map.of("valor", configuracao.salvarPiso(id, request.valor(), autenticacao.getName()));
     }
 
     @GetMapping("/politica")
@@ -66,11 +79,13 @@ class PrecificacaoController {
 
     @org.springframework.web.bind.annotation.PostMapping("/simular")
     SugestaoPrecoResponse simular(@RequestBody SugestaoPrecoRequest request, Authentication autenticacao) {
+        atualizacoes.atualizarAutomaticamente();
         return agente.simular(request, autenticacao.getName());
     }
 
     @org.springframework.web.bind.annotation.PostMapping("/sugestoes")
     SugestaoPrecoResponse gerarSugestao(@RequestBody SugestaoPrecoRequest request, Authentication autenticacao) {
+        atualizacoes.atualizarAutomaticamente();
         return agente.gerarSugestao(request, autenticacao.getName());
     }
 

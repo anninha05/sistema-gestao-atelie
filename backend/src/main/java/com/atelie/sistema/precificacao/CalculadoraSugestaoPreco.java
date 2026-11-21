@@ -9,6 +9,13 @@ import org.springframework.stereotype.Component;
 public class CalculadoraSugestaoPreco {
     public CalculoSugestaoPreco calcular(BigDecimal precoBase, double ajustePid, BigDecimal descontoFidelidade,
             Integer minimoOrdensFidelidade, int ordensConcluidas, int ordensCanceladas, BigDecimal pisoMinimo) {
+        return calcular(precoBase, ajustePid, descontoFidelidade, minimoOrdensFidelidade,
+                ordensConcluidas, ordensCanceladas, pisoMinimo, null, null);
+    }
+
+    public CalculoSugestaoPreco calcular(BigDecimal precoBase, double ajustePid, BigDecimal descontoFidelidade,
+            Integer minimoOrdensFidelidade, int ordensConcluidas, int ordensCanceladas, BigDecimal pisoMinimo,
+            Double ajusteMinimo, Double ajusteMaximo) {
         if (precoBase == null || precoBase.signum() <= 0 || !Double.isFinite(ajustePid)
                 || ordensConcluidas < 0 || ordensCanceladas < 0)
             throw new RegraNegocioException("Informe preço-base, ajuste PID e histórico válidos.");
@@ -30,6 +37,19 @@ public class CalculadoraSugestaoPreco {
                 .setScale(2, RoundingMode.HALF_UP);
         BigDecimal piso = normalizar(pisoMinimo);
         BigDecimal sugerido = aposFidelidade.max(piso);
+        String explicacaoLimites = "";
+        if (ajusteMinimo != null || ajusteMaximo != null) {
+            if (ajusteMinimo == null || ajusteMaximo == null || !Double.isFinite(ajusteMinimo)
+                    || !Double.isFinite(ajusteMaximo) || ajusteMinimo <= -1 || ajusteMinimo >= ajusteMaximo)
+                throw new RegraNegocioException("Os limites da sugestão de preço são inválidos.");
+            BigDecimal menor = normalizar(base.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(ajusteMinimo))));
+            BigDecimal maior = normalizar(base.multiply(BigDecimal.ONE.add(BigDecimal.valueOf(ajusteMaximo))));
+            if (piso.compareTo(maior) > 0)
+                throw new RegraNegocioException("O preço mínimo cadastrado supera o aumento permitido sobre o preço atual. Revise o preço-base ou o mínimo da ordem.");
+            sugerido = sugerido.max(menor).min(maior);
+            explicacaoLimites = " Faixa permitida sobre o preço-base: " + percentual(ajusteMinimo)
+                    + " a " + percentual(ajusteMaximo) + "; o preço final respeita essa faixa e o piso.";
+        }
         String justificativa = "Preço-base " + moeda(base) + "; ajuste PID de "
                 + percentual(ajustePid) + " resulta em " + moeda(precoAjustado) + ". "
                 + (elegivel ? "Desconto de fidelidade de " + percentual(descontoAplicado.doubleValue())

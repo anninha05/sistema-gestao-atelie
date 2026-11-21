@@ -19,13 +19,15 @@ public class AprovacaoPrecoService {
     private final SugestaoPrecoRepository sugestoes;
     private final AprovacaoPrecoRepository aprovacoes;
     private final UsuarioRepository usuarios;
+    private final PisoPrecoOrdemRepository pisos;
 
     public AprovacaoPrecoService(OrdemServicoRepository ordens, SugestaoPrecoRepository sugestoes,
-            AprovacaoPrecoRepository aprovacoes, UsuarioRepository usuarios) {
+            AprovacaoPrecoRepository aprovacoes, UsuarioRepository usuarios, PisoPrecoOrdemRepository pisos) {
         this.ordens = ordens;
         this.sugestoes = sugestoes;
         this.aprovacoes = aprovacoes;
         this.usuarios = usuarios;
+        this.pisos = pisos;
     }
 
     @Transactional
@@ -42,6 +44,12 @@ public class AprovacaoPrecoService {
             throw new RegraNegocioException("A sugestão informada pertence a outra ordem de serviço.");
         if (aprovacoes.existsBySugestaoId(sugestao.getId()))
             throw new RegraNegocioException("Esta sugestão já foi aprovada.");
+
+        if (ordem.getValorTotal().compareTo(sugestao.getPrecoBase()) != 0)
+            throw new RegraNegocioException("O preço da ordem mudou. Consulte uma nova sugestão antes de confirmar.");
+        var piso = pisos.findById(ordemId).map(PisoPrecoOrdem::getValor).orElse(sugestao.getPisoMinimo());
+        if (sugestao.getPrecoSugerido().compareTo(piso) < 0)
+            throw new RegraNegocioException("O preço mínimo mudou. Consulte uma nova sugestão antes de confirmar.");
 
         Usuario responsavel = usuarios.findByEmail(email).orElseThrow(() ->
                 new RecursoNaoEncontradoException("Usuário responsável não encontrado."));

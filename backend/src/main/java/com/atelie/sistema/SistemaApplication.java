@@ -6,6 +6,7 @@ import java.time.ZoneId;
 import java.util.TimeZone;
 
 @SpringBootApplication
+@org.springframework.scheduling.annotation.EnableScheduling
 public class SistemaApplication {
 	public static final ZoneId FUSO_DO_ATELIE = ZoneId.of("America/Sao_Paulo");
 

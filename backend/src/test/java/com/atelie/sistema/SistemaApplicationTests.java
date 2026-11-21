@@ -43,6 +43,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(properties = {
+        "precificacao.agendamento.ativo=false",
+        "FRONTEND_ORIGIN=http://localhost:5173",
         "spring.config.import=optional:file:.env[.properties],optional:file:../.env[.properties]",
         "spring.datasource.url=${ATELIE_TEST_JDBC_URL:jdbc:postgresql://localhost:5432/atelie_test}",
         "ADMIN_EMAIL=",
@@ -196,6 +198,14 @@ class SistemaApplicationTests {
                 .andExpect(status().isOk());
 
         token = obterToken(admin);
+        // Salvar a meta já aciona o acompanhamento; a atualização manual posterior deve reutilizá-lo.
+        mvc.perform(put("/precificacao/metas/" + mesAtual).session(admin).header("X-CSRF-TOKEN", token)
+                .contentType("application/json")
+                .content("{\"valorMeta\":10000.00,\"indicador\":\"RESULTADO_DE_CAIXA\"}"))
+                .andExpect(status().isOk());
+        assertEquals(1, jdbc.queryForObject(
+                "select count(*) from precificacao_execucoes_pid where competencia = ? and data_apuracao = ?",
+                Integer.class, mesAtual.atDay(1), LocalDate.now()));
         var primeira = mvc.perform(post("/precificacao/atualizacao-diaria").session(admin)
                 .header("X-CSRF-TOKEN", token)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.mes").value(mesAtual.toString()))
@@ -273,7 +283,7 @@ class SistemaApplicationTests {
                 .contentType("application/json")
                 .content("""
                         {"ganhoProporcional":0,"ganhoIntegral":0,"ganhoDerivativo":0,
-                         "ajusteMinimo":-0.05,"ajusteMaximo":0.05,
+                         "ajusteMinimo":-0.20,"ajusteMaximo":0.20,
                          "descontoFidelidade":null,"quantidadeOsFidelidade":null}
                         """))
                 .andExpect(status().isOk());
@@ -325,6 +335,65 @@ class SistemaApplicationTests {
                 .header("X-CSRF-TOKEN", obterToken(producao)).contentType("application/json")
                 .content("{\"sugestaoId\":" + sugestaoId + "}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional
+    void fluxoSimplificadoCadastraMinimoSugereSemAlterarEConfirma() throws Exception {
+        // Remove somente a configuração dentro da transação de teste, revertida ao final.
+        jdbc.update("delete from precificacao_politica");
+        var cliente = clientes.cadastrarCliente(new ClienteRequestDTO("Cliente sugestão simples", "22999999999",
+                "simples-" + UUID.randomUUID() + "@email.com", gerarCpfParaTeste()));
+        var peca = pecas.cadastrarPeca(new PecaRequestDTO("Peça sugestão simples", TipoFluxo.LOCACAO,
+                new BigDecimal("150.00"), "M", "Rosa"));
+        var ordem = ordens.abrirOrdemServico(new OrdemServicoRequestDTO(cliente.id(), TipoFluxo.LOCACAO,
+                List.of(peca.id()), null, LocalDateTime.now().plusDays(25), LocalDateTime.now().plusDays(27),
+                null, null, null, null, LocalDateTime.now().plusDays(26), null));
+        var admin = autenticar(Perfil.ROLE_ADMIN);
+        String token = obterToken(admin);
+        mvc.perform(put("/precificacao/metas/" + java.time.YearMonth.now()).session(admin)
+                .header("Origin", "http://localhost:5173")
+                .header("X-CSRF-TOKEN", token).contentType("application/json")
+                .content("{\"valorMeta\":5000,\"indicador\":\"RESULTADO_DE_CAIXA\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/precificacao/politica").session(admin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.ajusteMinimo").value(-0.20))
+                .andExpect(jsonPath("$.ajusteMaximo").value(0.20));
+        String pedido = "{\"ordemServicoId\":\"" + ordem.id() + "\"}";
+        token = obterToken(admin);
+        mvc.perform(post("/precificacao/sugestoes").session(admin).header("X-CSRF-TOKEN", token)
+                .contentType("application/json").content(pedido)).andExpect(status().isBadRequest());
+        String caminhoPiso = "/precificacao/ordens/" + ordem.id() + "/preco-minimo";
+        mvc.perform(put(caminhoPiso).session(admin).header("Origin", "http://localhost:5173").header("X-CSRF-TOKEN", token)
+                .contentType("application/json").content("{\"valor\":0}")).andExpect(status().isBadRequest());
+        mvc.perform(put(caminhoPiso).session(admin).header("Origin", "http://localhost:5173").header("X-CSRF-TOKEN", token)
+                .contentType("application/json").content("{\"valor\":120}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.valor").value(120));
+        mvc.perform(get(caminhoPiso).session(admin)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.valor").value(120));
+        var gerada = mvc.perform(post("/precificacao/sugestoes").session(admin).header("X-CSRF-TOKEN", token)
+                .contentType("application/json").content(pedido)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.pisoMinimo").value(120)).andReturn();
+        var resultado = json.readTree(gerada.getResponse().getContentAsString());
+        long sugestaoId = resultado.get("id").asLong();
+        var sugerido = new BigDecimal(resultado.get("precoSugerido").asString());
+        assertTrue(sugerido.compareTo(new BigDecimal("120")) >= 0);
+        assertEquals(new BigDecimal("150.00"), ordens.buscarPorId(ordem.id()).valorTotal());
+        mvc.perform(post("/ordens-servico/" + ordem.id() + "/aprovar-preco").session(admin)
+                .header("X-CSRF-TOKEN", token).contentType("application/json")
+                .content("{\"sugestaoId\":" + sugestaoId + "}"))
+                .andExpect(status().isOk());
+        assertEquals(0, sugerido.compareTo(ordens.buscarPorId(ordem.id()).valorTotal()));
+    }
+
+    @Test
+    void precoMinimoSoPodeSerCadastradoPelaGerencia() throws Exception {
+        for (var perfil : List.of(Perfil.ROLE_ATENDENTE, Perfil.ROLE_PRODUCAO)) {
+            var sessao = autenticar(perfil);
+            mvc.perform(put("/precificacao/ordens/" + UUID.randomUUID() + "/preco-minimo").session(sessao)
+                    .header("X-CSRF-TOKEN", obterToken(sessao)).contentType("application/json")
+                    .content("{\"valor\":100}")).andExpect(status().isForbidden());
+        }
     }
 
     @Test
