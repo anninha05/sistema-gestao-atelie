@@ -1,6 +1,6 @@
 import { useContext, useState } from 'react';
 import { ContextoDeAutenticacao } from './AuthContext.jsx';
-import { Aviso, validarCampos } from '../../shared/Interface.jsx';
+import { Aviso, Marca, validarCampos } from '../../shared/Interface.jsx';
 import fotoAtelie from './atelie.webp';
 
 export default function LoginPage() {
@@ -33,10 +33,10 @@ export default function LoginPage() {
   return (
     <main className="login-layout">
       <section className="login-content" aria-labelledby="login-title">
+        <Marca />
         <div className="login-card">
-
-          <h1 id="login-title">Bem-vinda ao<br />seu ateliê!</h1>
-          <p className="intro">Entre para acompanhar o dia a dia do ateliê.</p>
+          <h1 id="login-title">Bem-vinda ao Sistema de Gestão de Ateliê</h1>
+          <p className="intro">Entre para acompanhar o dia a dia do seu ateliê.</p>
 
           <form className="login-form" onSubmit={enviar} aria-busy={enviando} noValidate>
             <label htmlFor="email">E-mail</label>
@@ -49,6 +49,7 @@ export default function LoginPage() {
             <button type="submit" disabled={enviando}>{enviando ? 'Entrando…' : 'Entrar'}</button>
           </form>
         </div>
+        <p className="login-rodape">Linho · Gestão de ateliê</p>
       </section>
 
       <aside className="login-story">
@@ -56,6 +57,7 @@ export default function LoginPage() {
         <div className="story-copy">
           <span className="eyebrow">Feito com cuidado, em cada detalhe</span>
           <p>Mais tempo para criar.<br />Mais leveza para gerir.</p>
+          <small>O cuidado do seu trabalho artesanal, também na organização do seu ateliê.</small>
         </div>
       </aside>
     </main>
