@@ -164,17 +164,17 @@ button:disabled { opacity: .55; cursor: not-allowed; }
   gap: .6rem;
   margin: 0 0 1rem;
   padding: .7rem .85rem;
-  border: 1px solid #f1c9c2;
+  border: 1px solid #eac3d3;
   border-radius: .6rem;
-  background: #fdf0ee;
-  color: #983327;
+  background: #fae8ef;
+  color: #812643;
   font-size: .85rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
-.aviso-sucesso { border-color: #c7e3cf; background: #eff8f1; color: #2c6942; }
-.aviso-info { border-color: #f1d3df; background: #fcf1f5; color: var(--accent-texto); }
+.aviso-sucesso { border-color: #e7bfd0; background: #faeaf1; color: #71334c; }
+.aviso-info { border-color: #e9d2dd; background: #fff8fb; color: #71334c; }
 
 .modal {
   width: min(calc(100% - 2rem), 38rem);
