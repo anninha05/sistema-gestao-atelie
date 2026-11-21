@@ -1,5 +1,8 @@
 package com.atelie.sistema.precificacao;
 
+import com.atelie.sistema.precificacao.agente.CalibradorGanhos;
+import com.atelie.sistema.precificacao.agente.ExperimentoPrecificacao;
+import com.atelie.sistema.precificacao.dto.CalibracaoGanhosResponse;
 import com.atelie.sistema.precificacao.dto.MetaMensalRequest;
 import com.atelie.sistema.precificacao.dto.MetaMensalResponse;
 import com.atelie.sistema.precificacao.dto.PoliticaPrecificacaoRequest;
@@ -78,6 +81,20 @@ class ConfiguracaoPrecificacaoService {
                 request.ajusteMinimo(), request.ajusteMaximo(), request.descontoFidelidade(),
                 request.quantidadeOsFidelidade(), responsavel);
         return resposta(politicas.save(politica));
+    }
+
+    @Transactional
+    CalibracaoGanhosResponse calibrarGanhos(String emailResponsavel) {
+        Usuario responsavel = buscarResponsavel(emailResponsavel);
+        PoliticaPrecificacao politica = politicas.findById(PoliticaPrecificacao.ID_UNICA).orElseThrow(() ->
+                new RecursoNaoEncontradoException("Configure a política de precificação antes de calibrar os ganhos."));
+        CalibradorGanhos.Resultado treino = new ExperimentoPrecificacao().treinar(politica.getGanhos());
+        ControladorPID.Ganhos novos = treino.calibrado();
+        politica.configurar(novos.kp(), novos.ki(), novos.kd(), politica.getAjusteMinimo(), politica.getAjusteMaximo(),
+                politica.getDescontoFidelidade(), politica.getQuantidadeOsFidelidade(), responsavel);
+        ControladorPID.Ganhos anteriores = treino.inicial();
+        return new CalibracaoGanhosResponse(anteriores.kp(), anteriores.ki(), anteriores.kd(), treino.custoInicial(),
+                novos.kp(), novos.ki(), novos.kd(), treino.custoFinal(), treino.historicoCusto().size() - 1);
     }
 
     @Transactional(readOnly = true)

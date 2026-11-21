@@ -87,7 +87,7 @@ class ControladorPIDTest {
         assertThrows(RegraNegocioException.class, () -> controlador.calcular(Double.MAX_VALUE, 2, null, 0, politica));
     }
 
-    private PoliticaPrecificacao politica(double kp, double ki, double kd, double minimo, double maximo) {
-        return new PoliticaPrecificacao(kp, ki, kd, minimo, maximo, BigDecimal.ZERO, 1, gerente);
+    private ControladorPID.Ganhos politica(double kp, double ki, double kd, double minimo, double maximo) {
+        return new PoliticaPrecificacao(kp, ki, kd, minimo, maximo, BigDecimal.ZERO, 1, gerente).getGanhos();
     }
 }

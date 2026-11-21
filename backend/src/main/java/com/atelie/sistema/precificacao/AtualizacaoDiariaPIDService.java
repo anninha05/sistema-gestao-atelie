@@ -2,6 +2,7 @@ package com.atelie.sistema.precificacao;
 
 import com.atelie.sistema.financeiro.DespesaRepository;
 import com.atelie.sistema.ordemservico.RecebimentoRepository;
+import com.atelie.sistema.precificacao.agente.AgentePrecificacao;
 import com.atelie.sistema.precificacao.dto.ExecucaoPIDResponse;
 import com.atelie.sistema.shared.exception.RecursoNaoEncontradoException;
 import com.atelie.sistema.shared.exception.RegraNegocioException;
@@ -75,13 +76,14 @@ class AtualizacaoDiariaPIDService {
         BigDecimal entradas = recebimentos.somarRecebimentos(inicio, fimExclusivo);
         BigDecimal saidas = despesas.somarPagamentos(inicio, fimExclusivo);
         BigDecimal realizado = zerar(entradas).subtract(zerar(saidas));
-        double erro = controlador.normalizarErro(meta.getValorMeta(), realizado, data.getDayOfMonth(), mes.lengthOfMonth());
         EstadoPID estado = estados.findById(competencia).orElseGet(() -> new EstadoPID(mes));
         long deltaDias = estado.getUltimaAtualizacao() == null ? 1
                 : ChronoUnit.DAYS.between(estado.getUltimaAtualizacao(), data);
-        ResultadoPID resultado = controlador.calcular(erro, deltaDias, estado.getErroAnterior(),
-                estado.getIntegralAcumulada(), politica);
-        estado.registrar(resultado.integralAcumulada(), erro, data);
+        AgentePrecificacao agente = new AgentePrecificacao(controlador, politica.getGanhos(),
+                estado.getIntegralAcumulada(), estado.getErroAnterior());
+        ResultadoPID resultado = agente.agir(new AgentePrecificacao.Percepcao(meta.getValorMeta(), realizado,
+                data.getDayOfMonth(), mes.lengthOfMonth(), deltaDias));
+        estado.registrar(agente.getIntegral(), agente.getErroAnterior(), data);
         estados.save(estado);
 
         BigDecimal referencia = meta.getValorMeta().multiply(BigDecimal.valueOf(data.getDayOfMonth()))

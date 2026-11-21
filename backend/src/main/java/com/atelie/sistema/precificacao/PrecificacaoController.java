@@ -4,6 +4,7 @@ import com.atelie.sistema.precificacao.dto.MetaMensalRequest;
 import com.atelie.sistema.precificacao.dto.MetaMensalResponse;
 import com.atelie.sistema.precificacao.dto.PoliticaPrecificacaoRequest;
 import com.atelie.sistema.precificacao.dto.PoliticaPrecificacaoResponse;
+import com.atelie.sistema.precificacao.dto.CalibracaoGanhosResponse;
 import com.atelie.sistema.precificacao.dto.ExecucaoPIDResponse;
 import com.atelie.sistema.precificacao.dto.SugestaoPrecoRequest;
 import com.atelie.sistema.precificacao.dto.SugestaoPrecoResponse;
@@ -23,13 +24,13 @@ import org.springframework.web.bind.annotation.RestController;
 class PrecificacaoController {
     private final ConfiguracaoPrecificacaoService configuracao;
     private final AtualizacaoDiariaPIDService atualizacoes;
-    private final AgentePrecificacaoService agente;
+    private final SugestaoPrecoService sugestoes;
 
     PrecificacaoController(ConfiguracaoPrecificacaoService configuracao, AtualizacaoDiariaPIDService atualizacoes,
-            AgentePrecificacaoService agente) {
+            SugestaoPrecoService sugestoes) {
         this.configuracao = configuracao;
         this.atualizacoes = atualizacoes;
-        this.agente = agente;
+        this.sugestoes = sugestoes;
     }
 
     @GetMapping("/metas/{mes}")
@@ -67,6 +68,11 @@ class PrecificacaoController {
         return configuracao.configurarPolitica(request, autenticacao.getName());
     }
 
+    @PostMapping("/politica/calibrar")
+    CalibracaoGanhosResponse calibrarGanhos(Authentication autenticacao) {
+        return configuracao.calibrarGanhos(autenticacao.getName());
+    }
+
     @PostMapping("/atualizacao-diaria")
     ExecucaoPIDResponse atualizarHoje(Authentication autenticacao) {
         return atualizacoes.atualizarHoje(autenticacao.getName());
@@ -80,17 +86,17 @@ class PrecificacaoController {
     @org.springframework.web.bind.annotation.PostMapping("/simular")
     SugestaoPrecoResponse simular(@RequestBody SugestaoPrecoRequest request, Authentication autenticacao) {
         atualizacoes.atualizarAutomaticamente();
-        return agente.simular(request, autenticacao.getName());
+        return sugestoes.simular(request, autenticacao.getName());
     }
 
     @org.springframework.web.bind.annotation.PostMapping("/sugestoes")
     SugestaoPrecoResponse gerarSugestao(@RequestBody SugestaoPrecoRequest request, Authentication autenticacao) {
         atualizacoes.atualizarAutomaticamente();
-        return agente.gerarSugestao(request, autenticacao.getName());
+        return sugestoes.gerarSugestao(request, autenticacao.getName());
     }
 
     @GetMapping("/sugestoes/{id}")
     SugestaoPrecoResponse buscarSugestao(@PathVariable Long id) {
-        return agente.buscar(id);
+        return sugestoes.buscar(id);
     }
 }

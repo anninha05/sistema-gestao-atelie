@@ -7,6 +7,19 @@ import org.springframework.stereotype.Component;
 /** Implementação manual do PID discreto usado pela precificação do Linho. */
 @Component
 public class ControladorPID {
+
+    public record Ganhos(double kp, double ki, double kd, double ajusteMinimo, double ajusteMaximo) {
+        public Ganhos {
+            if (!Double.isFinite(kp) || !Double.isFinite(ki) || !Double.isFinite(kd)
+                    || !Double.isFinite(ajusteMinimo) || !Double.isFinite(ajusteMaximo) || ajusteMinimo >= ajusteMaximo)
+                throw new RegraNegocioException("Informe ganhos PID finitos e limites de ajuste válidos.");
+        }
+
+        public Ganhos comGanhos(double novoKp, double novoKi, double novoKd) {
+            return new Ganhos(novoKp, novoKi, novoKd, ajusteMinimo, ajusteMaximo);
+        }
+    }
+
     public double normalizarErro(BigDecimal metaMensal, BigDecimal resultadoRealizado,
             int diaAtual, int diasNoMes) {
         if (metaMensal == null || resultadoRealizado == null || metaMensal.signum() <= 0)
@@ -24,45 +37,45 @@ public class ControladorPID {
     }
 
     public ResultadoPID calcular(double erroNormalizado, double deltaDias, Double erroAnterior,
-            double integralAnterior, PoliticaPrecificacao politica) {
-        if (politica == null) throw new RegraNegocioException("Configure a política PID antes do cálculo.");
+            double integralAnterior, Ganhos ganhos) {
+        if (ganhos == null) throw new RegraNegocioException("Informe os ganhos do PID antes do cálculo.");
         if (!Double.isFinite(erroNormalizado) || !Double.isFinite(deltaDias)
                 || !Double.isFinite(integralAnterior)
                 || erroAnterior != null && !Double.isFinite(erroAnterior))
             throw new RegraNegocioException("O cálculo PID exige valores numéricos finitos.");
         if (deltaDias <= 0) throw new RegraNegocioException("O intervalo entre cálculos deve ser maior que zero.");
 
-        double proporcional = politica.getGanhoProporcional() * erroNormalizado;
+        double proporcional = ganhos.kp() * erroNormalizado;
         double derivativo = erroAnterior == null ? 0
-                : politica.getGanhoDerivativo() * (erroNormalizado - erroAnterior) / deltaDias;
+                : ganhos.kd() * (erroNormalizado - erroAnterior) / deltaDias;
         double integralCandidata = integralAnterior + erroNormalizado * deltaDias;
         validarFinito(proporcional, derivativo, integralCandidata);
 
         double integral = integralCandidata;
-        double saidaBruta = proporcional + politica.getGanhoIntegral() * integral + derivativo;
+        double saidaBruta = proporcional + ganhos.ki() * integral + derivativo;
         validarFinito(saidaBruta);
-        double limitada = limitar(saidaBruta, politica);
-        double contribuicaoNovaIntegral = politica.getGanhoIntegral() * erroNormalizado * deltaDias;
-        boolean integralEmpurraSaturacaoSuperior = saidaBruta > politica.getAjusteMaximo()
+        double limitada = limitar(saidaBruta, ganhos);
+        double contribuicaoNovaIntegral = ganhos.ki() * erroNormalizado * deltaDias;
+        boolean integralEmpurraSaturacaoSuperior = saidaBruta > ganhos.ajusteMaximo()
                 && contribuicaoNovaIntegral > 0;
-        boolean integralEmpurraSaturacaoInferior = saidaBruta < politica.getAjusteMinimo()
+        boolean integralEmpurraSaturacaoInferior = saidaBruta < ganhos.ajusteMinimo()
                 && contribuicaoNovaIntegral < 0;
 
         if (integralEmpurraSaturacaoSuperior || integralEmpurraSaturacaoInferior) {
             integral = integralAnterior;
-            saidaBruta = proporcional + politica.getGanhoIntegral() * integral + derivativo;
+            saidaBruta = proporcional + ganhos.ki() * integral + derivativo;
             validarFinito(saidaBruta);
-            limitada = limitar(saidaBruta, politica);
+            limitada = limitar(saidaBruta, ganhos);
         }
 
-        double termoIntegral = politica.getGanhoIntegral() * integral;
+        double termoIntegral = ganhos.ki() * integral;
         validarFinito(termoIntegral);
         return new ResultadoPID(erroNormalizado, proporcional, termoIntegral, derivativo,
                 saidaBruta, limitada, integral);
     }
 
-    private double limitar(double valor, PoliticaPrecificacao politica) {
-        return Math.max(politica.getAjusteMinimo(), Math.min(valor, politica.getAjusteMaximo()));
+    private double limitar(double valor, Ganhos ganhos) {
+        return Math.max(ganhos.ajusteMinimo(), Math.min(valor, ganhos.ajusteMaximo()));
     }
 
     private void validarFinito(double... valores) {

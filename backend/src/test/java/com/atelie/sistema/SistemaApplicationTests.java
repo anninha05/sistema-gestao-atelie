@@ -162,6 +162,35 @@ class SistemaApplicationTests {
     }
 
     @Test
+    void gerenciaCalibraGanhosPorSimulacaoSemAlterarLimitesComerciais() throws Exception {
+        var admin = autenticar(Perfil.ROLE_ADMIN);
+        mvc.perform(put("/precificacao/politica").session(admin).header("X-CSRF-TOKEN", obterToken(admin))
+                .contentType("application/json")
+                .content("""
+                        {"ganhoProporcional":0.2,"ganhoIntegral":0.01,"ganhoDerivativo":0.05,
+                         "ajusteMinimo":-0.2,"ajusteMaximo":0.2}
+                        """))
+                .andExpect(status().isOk());
+
+        var resposta = mvc.perform(post("/precificacao/politica/calibrar").session(admin)
+                        .header("X-CSRF-TOKEN", obterToken(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.kpAnterior").value(0.2))
+                .andReturn();
+        var calibracao = json.readTree(resposta.getResponse().getContentAsString());
+        assertTrue(calibracao.get("custo").asDouble() <= calibracao.get("custoAnterior").asDouble());
+        mvc.perform(get("/precificacao/politica").session(admin))
+                .andExpect(jsonPath("$.ganhoProporcional").value(calibracao.get("kp").asDouble()))
+                .andExpect(jsonPath("$.ajusteMinimo").value(-0.2))
+                .andExpect(jsonPath("$.ajusteMaximo").value(0.2));
+
+        var atendente = autenticar(Perfil.ROLE_ATENDENTE);
+        mvc.perform(post("/precificacao/politica/calibrar").session(atendente)
+                        .header("X-CSRF-TOKEN", obterToken(atendente)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void perfilProducaoNaoPodeConsultarNemConfigurarPrecificacao() throws Exception {
         var producao = autenticar(Perfil.ROLE_PRODUCAO);
         mvc.perform(get("/precificacao/politica").session(producao)).andExpect(status().isForbidden());

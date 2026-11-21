@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-class AgentePrecificacaoService {
+class SugestaoPrecoService {
     private final OrdemServicoRepository ordens;
     private final ExecucaoPIDDiariaRepository execucoes;
     private final PoliticaPrecificacaoRepository politicas;
@@ -25,7 +25,7 @@ class AgentePrecificacaoService {
     private final CalculadoraSugestaoPreco calculadora;
     private final PisoPrecoOrdemRepository pisos;
 
-    AgentePrecificacaoService(OrdemServicoRepository ordens, ExecucaoPIDDiariaRepository execucoes,
+    SugestaoPrecoService(OrdemServicoRepository ordens, ExecucaoPIDDiariaRepository execucoes,
             PoliticaPrecificacaoRepository politicas, SugestaoPrecoRepository sugestoes,
             UsuarioRepository usuarios, CalculadoraSugestaoPreco calculadora, PisoPrecoOrdemRepository pisos) {
         this.ordens = ordens;

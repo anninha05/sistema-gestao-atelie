@@ -79,6 +79,10 @@ public class PoliticaPrecificacao {
         this.atualizadaEm = LocalDateTime.now();
     }
 
+    public ControladorPID.Ganhos getGanhos() {
+        return new ControladorPID.Ganhos(ganhoProporcional, ganhoIntegral, ganhoDerivativo, ajusteMinimo, ajusteMaximo);
+    }
+
     public Long getId() { return id; }
     public double getGanhoProporcional() { return ganhoProporcional; }
     public double getGanhoIntegral() { return ganhoIntegral; }
