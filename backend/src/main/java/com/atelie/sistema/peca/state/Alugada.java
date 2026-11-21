@@ -6,23 +6,23 @@ import com.atelie.sistema.shared.exception.RegraNegocioException;
 public class Alugada implements EstadoPeca {
 
     @Override
-    public void alugar(Peca peca) {
+    public EstadoPeca alugar(Peca peca) {
         throw new RegraNegocioException("A peça já está alugada.");
     }
 
     @Override
-    public void enviarParaCostura(Peca peca) {
+    public EstadoPeca enviarParaCostura(Peca peca) {
         throw new RegraNegocioException("A peça está alugada e não pode ir para costura antes da devolução.");
     }
 
     @Override
-    public void enviarParaLavagem(Peca peca) {
-        peca.setEstado(new EmLavagem());
+    public EstadoPeca enviarParaLavagem(Peca peca) {
+        return new EmLavagem();
     }
 
     @Override
-    public void devolverParaEstoque(Peca peca) {
-        peca.setEstado(new Disponivel());
+    public EstadoPeca devolverParaEstoque(Peca peca) {
+        throw new RegraNegocioException("Registre a devolução na ordem de serviço. A peça deve passar pela lavagem antes da liberação.");
     }
 
     @Override

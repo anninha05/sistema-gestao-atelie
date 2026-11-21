@@ -34,6 +34,7 @@ public class Recebimento {
         this.sinal = sinal;
     }
 
+    public Long getId() { return id; }
     public BigDecimal getValor() { return valor; }
     public LocalDate getData() { return data; }
     public MetodoPagamento getMetodo() { return metodo; }

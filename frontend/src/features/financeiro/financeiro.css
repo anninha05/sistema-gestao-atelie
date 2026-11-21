@@ -1,0 +1,33 @@
+.financeiro-resumo {
+  margin: 1.5rem 0 2rem;
+  padding: 1.25rem;
+  border: 1px solid var(--cor-borda, #e6c9d6);
+  border-radius: 1rem;
+  background: var(--cor-superficie, #fffafd);
+}
+
+.financeiro-resumo-cabecalho {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.financeiro-resumo-cabecalho h2 { margin: 0; }
+.financeiro-resumo-cabecalho p, .financeiro-resumo-observacao { color: var(--cor-texto-suave, #62585d); }
+.financeiro-resumo-cabecalho label { min-width: 10rem; }
+
+.financeiro-resumo-valores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: .75rem;
+}
+
+.financeiro-resumo-valores div { padding: .8rem; border-radius: .75rem; background: #faedf3; }
+.financeiro-resumo-valores dt { font-size: .85rem; }
+.financeiro-resumo-valores dd { margin: .35rem 0 0; font-weight: 700; }
+.financeiro-resumo-observacao { font-size: .82rem; }
+
+@media (max-width: 640px) {
+  .financeiro-resumo-cabecalho { align-items: stretch; flex-direction: column; }
+}

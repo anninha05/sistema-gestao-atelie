@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'react';
 import { api, requisitarComCsrf } from '../../shared/api.js';
 import { Aviso } from '../../shared/Interface.jsx';
+import { acoesDiretas, rotasDasAcoes } from './acoes.js';
 import '../../shared/styles/catalogo.css';
 
-const inicio = [['confeccao', 'Iniciar trabalho'], ['prova', 'Enviar para prova']];
-const emProva = [['confeccao', 'Iniciar ajustes'], ['passadoria', 'Iniciar passadoria']];
 const etapas = [
-  { rotulo: 'Aguardando início', estados: ['PENDENTE', 'RESERVADA'], acoes: inicio },
-  { rotulo: 'Confecção', estados: ['CONFECCAO'], acoes: [['prova', 'Enviar para prova']] },
-  { rotulo: 'Em prova', estados: ['PROVA', 'EM_PROVA'], acoes: emProva },
-  { rotulo: 'Ajustes', estados: ['AJUSTES'], acoes: [['prova', 'Enviar para prova'], ['passadoria', 'Iniciar passadoria']] },
-  { rotulo: 'Passadoria', estados: ['PASSADORIA'], acoes: [['concluir', 'Concluir produção']] },
+  { rotulo: 'Aguardando início', estados: ['PENDENTE', 'RESERVADA'] },
+  { rotulo: 'Confecção', estados: ['CONFECCAO'] },
+  { rotulo: 'Em prova', estados: ['PROVA', 'EM_PROVA'] },
+  { rotulo: 'Ajustes', estados: ['AJUSTES'] },
+  { rotulo: 'Passadoria', estados: ['PASSADORIA'] },
 ];
 const dataHora = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -24,10 +23,10 @@ export default function FilaCosturaPage({ titulo }) {
   useEffect(() => {
     const controlador = new AbortController();
     const configuracao = { signal: controlador.signal };
-    Promise.all([api.get('/ordens-servico', configuracao), api.get('/pecas', configuracao)])
+    Promise.all([api.get('/ordens-servico/producao', configuracao), api.get('/pecas/producao', configuracao)])
       .then(([ordens, pecas]) => setFila({
         ordens: ordens.data,
-        nomesDasPecas: new Map(pecas.data.map((peca) => [peca.id, peca.descricao])),
+        nomesDasPecas: new Map(pecas.data.map((peca) => [peca.id, peca.descricao + ' · ' + peca.codigoEtiqueta])),
       }))
       .catch(() => {
         if (!controlador.signal.aborted) setErroAoCarregar(true);
@@ -39,11 +38,8 @@ export default function FilaCosturaPage({ titulo }) {
     setAtualizando(ordem.id);
     setMensagem(null);
     try {
-      const { data } = await requisitarComCsrf('patch', '/ordens-servico/' + ordem.id + '/' + acao);
-      setFila((anterior) => ({
-        ...anterior,
-        ordens: anterior.ordens.map((item) => item.id === data.id ? data : item),
-      }));
+      await requisitarComCsrf('patch', '/ordens-servico/' + ordem.id + '/' + rotasDasAcoes[acao]);
+      setTentativa((anterior) => anterior + 1);
       setMensagem({ texto: 'Etapa atualizada para a ordem de ' + ordem.clienteNome + '.' });
     } catch (erro) {
       setMensagem({
@@ -86,19 +82,21 @@ export default function FilaCosturaPage({ titulo }) {
                 <li key={ordem.id} aria-busy={atualizando === ordem.id}>
                   <h3>{ordem.clienteNome}</h3>
                   <dl>
-                    <div><dt>Peças</dt><dd>{ordem.itens?.map((item) =>
+                    <div><dt>Peças</dt><dd>{ordem.pecas?.map((item) =>
                       fila.nomesDasPecas.get(item.pecaId) ?? item.pecaId).join(', ') || '—'}</dd></div>
                     <div><dt>Prazo</dt><dd>{prazo ? dataHora.format(new Date(prazo)) : '—'}</dd></div>
                     <div><dt>Prova</dt><dd>{ordem.dataProva ? dataHora.format(new Date(ordem.dataProva)) : '—'}</dd></div>
-                    <div><dt>Medidas</dt><dd>{ordem.medidas || '—'}</dd></div>
-                    <div><dt>Instruções de costura</dt><dd>{ordem.instrucoesCostura || '—'}</dd></div>
+                    {ordem.pecas?.map((item) => <div key={item.pecaId}>
+                      <dt>{fila.nomesDasPecas.get(item.pecaId) ?? 'Peça'} · medidas</dt><dd>{item.medidas || '—'}</dd>
+                      <dt>Instruções de costura</dt><dd>{item.instrucoesCostura || '—'}</dd>
+                    </div>)}
                   </dl>
                   <div className="fila-acoes">
-                    {etapa.acoes.filter(([acao]) => ordem.statusAtual !== 'PROVA' || acao !== 'passadoria')
-                      .map(([acao, rotulo]) => (
-                        <button key={acao} type="button" disabled={atualizando !== null}
-                          onClick={() => avancar(ordem, acao)}>{rotulo}</button>
-                      ))}
+                    {acoesDiretas(ordem).map((item) => (
+                      <button key={item.acao} type="button" disabled={atualizando !== null || !item.habilitada}
+                        title={item.motivoBloqueio ?? undefined}
+                        onClick={() => avancar(ordem, item.acao)}>{item.rotulo}</button>
+                    ))}
                   </div>
                 </li>
               );

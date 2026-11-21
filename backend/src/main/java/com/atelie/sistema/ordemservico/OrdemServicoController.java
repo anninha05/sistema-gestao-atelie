@@ -1,16 +1,20 @@
 package com.atelie.sistema.ordemservico;
 
+import com.atelie.sistema.ordemservico.dto.OrdemProducaoResponse;
 import com.atelie.sistema.ordemservico.dto.OrdemServicoRequestDTO;
 import com.atelie.sistema.ordemservico.dto.OrdemServicoResponseDTO;
 import com.atelie.sistema.ordemservico.dto.PagamentoResponse;
+import com.atelie.sistema.ordemservico.dto.ReagendarOrdemServicoRequest;
 import com.atelie.sistema.ordemservico.dto.RegistrarPagamentoRequest;
-import com.atelie.sistema.ordemservico.state.StatusOrdemServico;
+import com.atelie.sistema.usuario.Perfil;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/ordens-servico")
@@ -23,84 +27,98 @@ public class OrdemServicoController {
     }
 
     @PostMapping
-    public ResponseEntity<OrdemServicoResponseDTO> abrir(@RequestBody OrdemServicoRequestDTO dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(ordemServicoService.abrirOrdemServico(dto));
+    public ResponseEntity<OrdemServicoResponseDTO> abrir(@RequestBody OrdemServicoRequestDTO dto, Authentication usuario) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ordemServicoService.abrirOrdemServico(dto).paraPerfil(Perfil.de(usuario)));
     }
 
     @GetMapping
-    public ResponseEntity<List<OrdemServicoResponseDTO>> listar() {
-        return ResponseEntity.ok(ordemServicoService.listarTodas());
+    public List<OrdemServicoResponseDTO> listar(Authentication usuario) {
+        Perfil perfil = Perfil.de(usuario);
+        return ordemServicoService.listarTodas().stream().map(ordem -> ordem.paraPerfil(perfil)).toList();
+    }
+
+    @GetMapping("/producao")
+    public List<OrdemProducaoResponse> listarFilaProducao(Authentication usuario) {
+        Perfil perfil = Perfil.de(usuario);
+        return ordemServicoService.listarFilaProducao().stream().map(ordem -> ordem.paraPerfil(perfil)).toList();
     }
 
     @GetMapping("/disponibilidade")
-    public java.util.Map<String, Boolean> consultarDisponibilidade(
-            @RequestParam UUID pecaId,
-            @RequestParam java.time.LocalDateTime inicio,
-            @RequestParam java.time.LocalDateTime fim) {
-        return java.util.Map.of("disponivel", ordemServicoService.disponivelNoPeriodo(pecaId, inicio, fim));
+    public Map<String, Boolean> consultarDisponibilidade(@RequestParam UUID pecaId,
+            @RequestParam LocalDateTime inicio, @RequestParam LocalDateTime fim) {
+        return Map.of("disponivel", ordemServicoService.disponivelNoPeriodo(pecaId, inicio, fim));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<OrdemServicoResponseDTO> buscarPorId(@PathVariable UUID id) {
-        return ResponseEntity.ok(ordemServicoService.buscarPorId(id));
+    public OrdemServicoResponseDTO buscarPorId(@PathVariable UUID id, Authentication usuario) {
+        return ordemServicoService.buscarPorId(id).paraPerfil(Perfil.de(usuario));
     }
 
-    @GetMapping("/status/{status}")
-    public ResponseEntity<List<OrdemServicoResponseDTO>> listarPorStatus(@PathVariable StatusOrdemServico status) {
-        return ResponseEntity.ok(ordemServicoService.listarPorStatus(status));
+    @PatchMapping("/{id}/reagendar")
+    public OrdemServicoResponseDTO reagendar(@PathVariable UUID id,
+            @RequestBody ReagendarOrdemServicoRequest request, Authentication usuario) {
+        return ordemServicoService.reagendar(id, request).paraPerfil(Perfil.de(usuario));
     }
 
     @PatchMapping("/{id}/confeccao")
-    public ResponseEntity<OrdemServicoResponseDTO> iniciarConfeccao(@PathVariable UUID id) {
-        return ResponseEntity.ok(ordemServicoService.iniciarConfeccao(id));
+    public Object iniciarConfeccao(@PathVariable UUID id, Authentication usuario) {
+        ordemServicoService.iniciarConfeccao(id);
+        return respostaAtualizada(id, usuario);
     }
 
     @PatchMapping("/{id}/prova")
-    public ResponseEntity<OrdemServicoResponseDTO> enviarParaProva(@PathVariable UUID id) {
-        return ResponseEntity.ok(ordemServicoService.enviarParaProva(id));
+    public Object enviarParaProva(@PathVariable UUID id, Authentication usuario) {
+        ordemServicoService.enviarParaProva(id);
+        return respostaAtualizada(id, usuario);
     }
 
     @PatchMapping("/{id}/passadoria")
-    public OrdemServicoResponseDTO iniciarPassadoria(@PathVariable UUID id) {
-        return ordemServicoService.iniciarPassadoria(id);
-    }
-
-    @PatchMapping("/{id}/cancelar")
-    public OrdemServicoResponseDTO cancelar(@PathVariable UUID id) {
-        return ordemServicoService.cancelar(id);
+    public Object iniciarPassadoria(@PathVariable UUID id, Authentication usuario) {
+        ordemServicoService.iniciarPassadoria(id);
+        return respostaAtualizada(id, usuario);
     }
 
     @PatchMapping("/{id}/concluir")
-    public ResponseEntity<OrdemServicoResponseDTO> concluir(@PathVariable UUID id) {
-        return ResponseEntity.ok(ordemServicoService.concluir(id));
+    public Object concluir(@PathVariable UUID id, Authentication usuario) {
+        ordemServicoService.concluir(id);
+        return respostaAtualizada(id, usuario);
+    }
+
+    @PatchMapping("/{id}/cancelar")
+    public OrdemServicoResponseDTO cancelar(@PathVariable UUID id, Authentication usuario) {
+        return ordemServicoService.cancelar(id).paraPerfil(Perfil.de(usuario));
     }
 
     @PatchMapping("/{id}/retirar")
-    public ResponseEntity<OrdemServicoResponseDTO> retirar(@PathVariable UUID id) {
-        return ResponseEntity.ok(ordemServicoService.retirar(id));
+    public OrdemServicoResponseDTO retirar(@PathVariable UUID id, Authentication usuario) {
+        return ordemServicoService.retirar(id).paraPerfil(Perfil.de(usuario));
     }
 
     @PatchMapping("/{id}/devolver")
-    public ResponseEntity<OrdemServicoResponseDTO> devolver(@PathVariable UUID id) {
-        return ResponseEntity.ok(ordemServicoService.devolver(id));
+    public OrdemServicoResponseDTO devolver(@PathVariable UUID id, Authentication usuario) {
+        return ordemServicoService.devolver(id).paraPerfil(Perfil.de(usuario));
     }
 
     @PostMapping("/{id}/pagamentos/sinal")
-    public ResponseEntity<PagamentoResponse> registrarSinal(
-            @PathVariable UUID id,
-            @RequestBody RegistrarPagamentoRequest request) {
-        return ResponseEntity.ok(ordemServicoService.registrarSinal(id, request));
+    public PagamentoResponse registrarSinal(@PathVariable UUID id, @RequestBody RegistrarPagamentoRequest request) {
+        return ordemServicoService.registrarSinal(id, request);
     }
 
     @PostMapping("/{id}/pagamentos")
-    public ResponseEntity<PagamentoResponse> registrarPagamento(
-            @PathVariable UUID id,
-            @RequestBody RegistrarPagamentoRequest request) {
-        return ResponseEntity.ok(ordemServicoService.registrarPagamento(id, request));
+    public PagamentoResponse registrarPagamento(@PathVariable UUID id, @RequestBody RegistrarPagamentoRequest request) {
+        return ordemServicoService.registrarPagamento(id, request);
     }
 
     @GetMapping("/{id}/pagamentos")
-    public ResponseEntity<PagamentoResponse> buscarPagamento(@PathVariable UUID id) {
-        return ResponseEntity.ok(ordemServicoService.buscarPagamento(id));
+    public PagamentoResponse buscarPagamento(@PathVariable UUID id) {
+        return ordemServicoService.buscarPagamento(id);
+    }
+
+    private Object respostaAtualizada(UUID id, Authentication usuario) {
+        Perfil perfil = Perfil.de(usuario);
+        return perfil == Perfil.ROLE_PRODUCAO
+                ? ordemServicoService.buscarParaProducao(id).paraPerfil(perfil)
+                : ordemServicoService.buscarPorId(id).paraPerfil(perfil);
     }
 }

@@ -9,4 +9,6 @@ public interface ClienteRepository extends JpaRepository<Cliente, UUID> {
     Optional<Cliente> findByCpf(String cpf);
 
     boolean existsByCpf(String cpf);
+
+    boolean existsByCpfAndIdNot(String cpf, UUID id);
 }

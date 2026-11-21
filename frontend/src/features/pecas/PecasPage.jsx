@@ -16,12 +16,13 @@ const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL
 
 export default function PecasPage({ titulo }) {
   const { usuario } = useContext(ContextoDeAutenticacao);
+  const ehProducao = usuario.perfil === 'ROLE_PRODUCAO';
   const [tipo, setTipo] = useState('');
   const [estado, setEstado] = useState('');
 
   return (
     <Catalogo titulo={titulo} descricao="Consulte e cadastre as peças do ateliê."
-      caminho="/pecas" rotuloCadastro="Nova peça" rotuloBusca="Buscar por descrição ou etiqueta"
+      caminho={ehProducao ? '/pecas/producao' : '/pecas'} rotuloCadastro="Nova peça" rotuloBusca="Buscar por descrição ou etiqueta"
       cadastroDesabilitado={usuario.perfil === 'ROLE_PRODUCAO'}
       correspondeABusca={(peca, busca) => {
         const termo = busca.toLocaleLowerCase('pt-BR');
@@ -53,6 +54,18 @@ export default function PecasPage({ titulo }) {
         cor: formulario.get('cor').trim() || null,
         valorBase: Number(formulario.get('valorBase')),
       })}
+      camposEdicao={(peca) => <>
+        <label>Descrição<input name="descricao" defaultValue={peca.descricao} maxLength={255} required /></label>
+        <label>Tamanho<input name="tamanho" defaultValue={peca.tamanho || ''} maxLength={10} /></label>
+        <label>Cor<input name="cor" defaultValue={peca.cor || ''} maxLength={50} /></label>
+        <label>Valor base (R$)<input name="valorBase" type="number" inputMode="decimal" defaultValue={peca.valorBase}
+          min="0" max="99999999.99" step="0.01" required /></label>
+      </>}
+      montarDadosEdicao={(formulario, peca) => ({
+        descricao: formulario.get('descricao').trim(), tipo: peca.tipo,
+        tamanho: formulario.get('tamanho').trim() || null,
+        cor: formulario.get('cor').trim() || null, valorBase: Number(formulario.get('valorBase')),
+      })}
       aoCadastrar={() => {
         setTipo('');
         setEstado('');
@@ -65,7 +78,7 @@ export default function PecasPage({ titulo }) {
         ['Estado', estados[peca.status] || peca.status],
         ['Tamanho', peca.tamanho],
         ['Cor', peca.cor],
-        ['Valor base', peca.valorBase == null ? null : moeda.format(peca.valorBase)],
+        ...(!ehProducao ? [['Valor base', peca.valorBase == null ? null : moeda.format(peca.valorBase)]] : []),
       ]}
     />
   );

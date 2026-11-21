@@ -71,6 +71,13 @@ public class Cliente {
         return cpf;
     }
 
+    public void atualizarContatos(String nome, String telefone, String email, String cpf) {
+        this.nome = nome;
+        this.telefone = telefone;
+        this.email = email;
+        this.cpf = cpf;
+    }
+
     public LocalDateTime getCriadoEm() {
         return criadoEm;
     }

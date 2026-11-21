@@ -1,6 +1,9 @@
 package com.atelie.sistema.peca;
 
-import com.atelie.sistema.peca.state.*;
+import com.atelie.sistema.peca.state.Disponivel;
+import com.atelie.sistema.peca.state.EstadoPeca;
+import com.atelie.sistema.peca.state.StatusDisponibilidade;
+import com.atelie.sistema.shared.exception.RegraNegocioException;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -16,10 +19,6 @@ public class Peca {
 
     @Column(name = "codigo_etiqueta", nullable = false, unique = true, length = 40)
     private String codigoEtiqueta = UUID.randomUUID().toString();
-
-    public String getCodigoEtiqueta() {
-        return codigoEtiqueta;
-    }
 
     @Column(nullable = false)
     private String descricao;
@@ -56,83 +55,93 @@ public class Peca {
     public Peca(String descricao, TipoFluxo tipo) {
         this.descricao = descricao;
         this.tipo = tipo;
-        this.setEstado(new Disponivel());
+        aplicar(new Disponivel());
+    }
+
+    public Peca(String descricao, TipoFluxo tipo, BigDecimal valorBase, String tamanho, String cor) {
+        this(descricao, tipo);
+        atualizarDadosDoCatalogo(descricao, valorBase == null ? BigDecimal.ZERO : valorBase, tamanho, cor);
     }
 
     // STATE PATTERN
 
     public EstadoPeca getEstado() {
-        if (this.estado == null) {
-            this.estado = mapearEstado(this.statusDisponibilidade);
+        if (estado == null) {
+            estado = EstadoPeca.de(statusDisponibilidade);
         }
-        return this.estado;
+        return estado;
     }
 
-    public void setEstado(EstadoPeca estado) {
-        this.estado = estado;
-        this.statusDisponibilidade = estado.getStatus();
-    }
-
-    private EstadoPeca mapearEstado(StatusDisponibilidade status) {
-        if (status == null) {
-            return new Disponivel();
-        }
-        return switch (status) {
-            case ALUGADA -> new Alugada();
-            case EM_COSTURA, MANUTENCAO -> new EmCostura();
-            case EM_LAVAGEM -> new EmLavagem();
-            case DISPONIVEL -> new Disponivel();
-        };
+    private void aplicar(EstadoPeca novoEstado) {
+        this.estado = novoEstado;
+        this.statusDisponibilidade = novoEstado.getStatus();
     }
 
     @PostLoad
     protected void onPostLoad() {
-        this.estado = mapearEstado(this.statusDisponibilidade);
+        this.estado = EstadoPeca.de(this.statusDisponibilidade);
     }
 
-    public void marcarComoAlugada() {
-        getEstado().alugar(this);
+    public void retirarParaLocacao() {
+        if (tipo != TipoFluxo.LOCACAO || statusDisponibilidade != StatusDisponibilidade.DISPONIVEL) {
+            throw new RegraNegocioException(
+                    "A peça " + codigoEtiqueta + " não está pronta para retirada. Verifique sua condição no inventário.");
+        }
+        aplicar(getEstado().alugar(this));
+    }
+
+    public void devolverDaLocacao() {
+        if (tipo != TipoFluxo.LOCACAO || statusDisponibilidade != StatusDisponibilidade.ALUGADA) {
+            throw new RegraNegocioException(
+                    "A peça " + codigoEtiqueta + " precisa estar alugada para registrar sua devolução.");
+        }
+        aplicar(getEstado().enviarParaLavagem(this));
     }
 
     public void enviarParaCostura() {
-        getEstado().enviarParaCostura(this);
+        aplicar(getEstado().enviarParaCostura(this));
     }
 
     public void enviarParaLavagem() {
-        getEstado().enviarParaLavagem(this);
+        if (statusDisponibilidade == StatusDisponibilidade.ALUGADA) {
+            throw new RegraNegocioException(
+                    "Registre a devolução na ordem de serviço para encaminhar a peça à lavagem.");
+        }
+        aplicar(getEstado().enviarParaLavagem(this));
     }
 
-    public void devolverParaEstoque() {
-        getEstado().devolverParaEstoque(this);
+    public void devolverParaEstoque(boolean lavagemConcluida, boolean condicoesConferidas) {
+        if (!lavagemConcluida || !condicoesConferidas) {
+            throw new RegraNegocioException(
+                    "Confirme a lavagem concluída e as condições da peça antes de liberá-la ao estoque.");
+        }
+        aplicar(getEstado().devolverParaEstoque(this));
     }
 
-    public void enviarParaManutencao() {
-        enviarParaCostura();
+    public void atualizarDadosDoCatalogo(String descricao, BigDecimal valorBase, String tamanho, String cor) {
+        this.descricao = descricao;
+        this.valorBase = valorBase;
+        this.tamanho = tamanho;
+        this.cor = cor;
     }
-
-    // AUDITORIA
 
     @PrePersist
     protected void onCreate() {
         this.criadoEm = LocalDateTime.now();
-        this.atualizadoEm = LocalDateTime.now();
-        if (this.statusDisponibilidade == null && this.estado != null) {
-            this.statusDisponibilidade = this.estado.getStatus();
-        }
+        this.atualizadoEm = this.criadoEm;
     }
 
     @PreUpdate
     protected void onUpdate() {
         this.atualizadoEm = LocalDateTime.now();
-        if (this.estado != null) {
-            this.statusDisponibilidade = this.estado.getStatus();
-        }
     }
-
-    // GETTERS & SETTERS
 
     public UUID getId() {
         return id;
+    }
+
+    public String getCodigoEtiqueta() {
+        return codigoEtiqueta;
     }
 
     public String getDescricao() {
@@ -151,24 +160,12 @@ public class Peca {
         return valorBase;
     }
 
-    public void setValorBase(BigDecimal valorBase) {
-        this.valorBase = valorBase;
-    }
-
     public String getTamanho() {
         return tamanho;
     }
 
-    public void setTamanho(String tamanho) {
-        this.tamanho = tamanho;
-    }
-
     public String getCor() {
         return cor;
-    }
-
-    public void setCor(String cor) {
-        this.cor = cor;
     }
 
     public LocalDateTime getCriadoEm() {

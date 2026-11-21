@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "pagamentos")
@@ -46,23 +48,7 @@ public class Pagamento {
 
     @OneToMany(mappedBy = "pagamento", cascade = CascadeType.ALL)
     @OrderBy("id ASC")
-    private java.util.List<Recebimento> recebimentos = new java.util.ArrayList<>();
-
-    public java.util.List<Recebimento> getRecebimentos() {
-        return java.util.List.copyOf(recebimentos);
-    }
-
-    public void registrarRecebimento(BigDecimal valor, LocalDate data, MetodoPagamento metodo, boolean sinal) {
-        if (data == null || metodo == null) {
-            throw new RegraNegocioException("Informe a data e o método de pagamento.");
-        }
-        if (sinal) {
-            registrarSinal(valor, data);
-        } else {
-            registrarPagamento(valor);
-        }
-        recebimentos.add(new Recebimento(this, normalizar(valor), data, metodo, sinal));
-    }
+    private List<Recebimento> recebimentos = new ArrayList<>();
 
     protected Pagamento() {
     }
@@ -80,7 +66,23 @@ public class Pagamento {
         recalcular();
     }
 
-    public void registrarSinal(BigDecimal valor, LocalDate data) {
+    public List<Recebimento> getRecebimentos() {
+        return List.copyOf(recebimentos);
+    }
+
+    public void registrarRecebimento(BigDecimal valor, LocalDate data, MetodoPagamento metodo, boolean sinal) {
+        if (data == null || metodo == null) {
+            throw new RegraNegocioException("Informe a data e o método de pagamento.");
+        }
+        if (sinal) {
+            registrarSinal(valor, data);
+        } else {
+            registrarPagamento(valor);
+        }
+        recebimentos.add(new Recebimento(this, normalizar(valor), data, metodo, sinal));
+    }
+
+    private void registrarSinal(BigDecimal valor, LocalDate data) {
         if (this.valorSinalPago.compareTo(BigDecimal.ZERO) > 0 || this.dataPagamentoSinal != null) {
             throw new RegraNegocioException("O sinal já foi registrado para esta ordem de serviço.");
         }
@@ -93,11 +95,11 @@ public class Pagamento {
 
         this.valorSinalPago = valorNormalizado;
         this.valorPago = normalizar(this.valorPago.add(valorNormalizado));
-        this.dataPagamentoSinal = data != null ? data : LocalDate.now();
+        this.dataPagamentoSinal = data;
         recalcular();
     }
 
-    public void registrarPagamento(BigDecimal valor) {
+    private void registrarPagamento(BigDecimal valor) {
         validarValorPositivo(valor, "O valor do pagamento deve ser maior que zero.");
 
         BigDecimal valorNormalizado = normalizar(valor);

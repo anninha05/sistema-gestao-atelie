@@ -96,6 +96,14 @@
 }
 .catalogo .ordem-pecas input[type="checkbox"]:disabled { opacity: .6; cursor: wait; }
 
+.fila-acoes button[aria-describedby]:disabled { cursor: not-allowed; }
+
+.acao-bloqueada {
+  margin: .5rem 0 0;
+  color: var(--muted);
+  font-size: .875rem;
+}
+
 .fila-acoes {
   display: flex;
   flex-wrap: wrap;

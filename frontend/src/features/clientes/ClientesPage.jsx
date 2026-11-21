@@ -1,4 +1,38 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import Catalogo from '../../shared/Catalogo.jsx';
+import { api } from '../../shared/api.js';
+import { Aviso, Modal } from '../../shared/Interface.jsx';
+
+const dataHora = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+const estados = { RESERVADA: 'Reservada', CONFECCAO: 'Confecção', PROVA: 'Prova', EM_PROVA: 'Em prova',
+  AJUSTES: 'Ajustes', PASSADORIA: 'Passadoria', CONCLUIDO: 'Concluída', RETIRADA: 'Retirada',
+  DEVOLVIDA: 'Devolvida', ENTREGUE: 'Entregue', CANCELADA: 'Cancelada' };
+
+function HistoricoCliente({ cliente }) {
+  const [aberto, setAberto] = useState(false);
+  const [ordens, setOrdens] = useState(null);
+  const [erro, setErro] = useState(false);
+  async function carregar() {
+    setAberto(true); setErro(false); setOrdens(null);
+    try { const { data } = await api.get('/clientes/' + cliente.id + '/ordens-servico'); setOrdens(data); }
+    catch { setErro(true); }
+  }
+  return <>
+    <button type="button" className="botao-secundario" onClick={carregar}>Histórico de ordens</button>
+    {aberto && <Modal titulo={'Ordens de ' + cliente.nome} aoFechar={() => setAberto(false)}>
+      {erro && <Aviso>Não foi possível consultar o histórico deste cliente.</Aviso>}
+      {!ordens && !erro && <p role="status">Consultando histórico…</p>}
+      {ordens && ordens.length === 0 && <p>Este cliente ainda não possui ordens de serviço.</p>}
+      {ordens?.length > 0 && <ul className="catalogo-lista" role="list">{ordens.map((ordem) => <li key={ordem.id}>
+        <h3>{ordem.tipoFluxo === 'LOCACAO' ? 'Locação' : 'Sob medida'} · {estados[ordem.statusAtual] || ordem.statusAtual}</h3>
+        <p>Ordem {ordem.id}</p>
+        <p>{ordem.inicioLocacao ? dataHora.format(new Date(ordem.inicioLocacao)) : ordem.dataEntrega ? dataHora.format(new Date(ordem.dataEntrega)) : 'Sem data informada'}</p>
+        <Link to={'/ordens-servico#' + ordem.id} onClick={() => setAberto(false)}>Abrir na lista de ordens</Link>
+      </li>)}</ul>}
+    </Modal>}
+  </>;
+}
 
 function correspondeABusca(cliente, busca) {
   const termo = busca.toLocaleLowerCase('pt-BR');
@@ -28,6 +62,17 @@ export default function ClientesPage({ titulo }) {
         telefone: data.get('telefone').trim(),
         email: data.get('email').trim(),
       })}
+      camposEdicao={(cliente) => <>
+        <label>Nome<input name="nome" defaultValue={cliente.nome} maxLength={255} required /></label>
+        <label>CPF<input name="cpf" defaultValue={cliente.cpf} inputMode="numeric" maxLength={14} required /></label>
+        <label>Telefone<input name="telefone" defaultValue={cliente.telefone} type="tel" maxLength={20} required /></label>
+        <label>E-mail<input name="email" defaultValue={cliente.email} type="email" maxLength={100} required /></label>
+      </>}
+      montarDadosEdicao={(data) => ({
+        nome: data.get('nome').trim(), cpf: data.get('cpf').trim(),
+        telefone: data.get('telefone').trim(), email: data.get('email').trim(),
+      })}
+      acoesDoItem={(cliente) => <HistoricoCliente cliente={cliente} />}
       tituloDoItem={(cliente) => cliente.nome}
       detalhesDoItem={(cliente) => [
         ['CPF', cliente.cpf.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4')],

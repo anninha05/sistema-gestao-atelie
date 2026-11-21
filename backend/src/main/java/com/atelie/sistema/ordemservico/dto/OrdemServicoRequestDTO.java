@@ -18,5 +18,14 @@ public record OrdemServicoRequestDTO(
         String instrucoesCostura,
         String medidas,
         LocalDateTime dataEntrega,
-        BigDecimal descontoPercentual) {
+        BigDecimal descontoPercentual,
+        List<ItemProducaoRequest> detalhesItens) {
+
+    public OrdemServicoRequestDTO(UUID clienteId, TipoFluxo tipoFluxo, List<UUID> pecas, BigDecimal desconto,
+            LocalDateTime inicioLocacao, LocalDateTime fimLocacao, LocalDateTime dataProva,
+            LocalDateTime dataEvento, String instrucoesCostura, String medidas,
+            LocalDateTime dataEntrega, BigDecimal descontoPercentual) {
+        this(clienteId, tipoFluxo, pecas, desconto, inicioLocacao, fimLocacao, dataProva, dataEvento,
+                instrucoesCostura, medidas, dataEntrega, descontoPercentual, null);
+    }
 }
