@@ -1,34 +1,25 @@
 import { useContext, useState } from 'react';
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { ContextoDeAutenticacao } from '../features/auth/AuthContext.jsx';
-import { Aviso, Modal } from '../shared/Interface.jsx';
+import { Aviso, Icone, Marca, Modal } from '../shared/Interface.jsx';
 import './workspace.css';
 
-const desenhos = {
-  painel: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
-  clientes: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0z M22 21v-2a4 4 0 0 0-3-4 M17 3a4 4 0 0 1 0 8',
-  pecas: 'M10 7a2 2 0 1 1 3.4 1.4L12 10v2 M12 12l9 5v3H3v-3z',
-  ordens: 'M9 4H5v17h14V4h-4 M9 2h6v5H9z M8 12h8 M8 16h6',
-  financeiro: 'M3 5h18v14H3z M3 9h18 M7 15h4',
-  costura: 'M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6z M8 8l13 13 M8 16L21 3',
-  perfil: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0z',
-  sair: 'M10 4H4v16h6 M10 12h11 M17 8l4 4-4 4',
-};
+const formatoData = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
 
-function IconeNavegacao({ nome }) {
-  return (
-    <svg className="workspace-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d={desenhos[nome]} />
-    </svg>
-  );
+function dataDeHoje() {
+  const texto = formatoData.format(new Date());
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
 export default function LayoutDoAtelie({ perfil, paginas, children }) {
   const { usuario, sair } = useContext(ContextoDeAutenticacao);
+  const { pathname } = useLocation();
   const [saindo, setSaindo] = useState(false);
   const [erro, setErro] = useState('');
   const [perfilAberto, setPerfilAberto] = useState(false);
+  const pagina = pathname === '/usuarios' ? { caminho: pathname, rotulo: 'Usuários' }
+    : paginas.find(({ caminho }) => pathname === caminho || pathname.startsWith(caminho + '/'));
+  const emDetalhe = pagina && pathname !== pagina.caminho;
 
   async function sairDaConta() {
     setErro('');
@@ -41,68 +32,87 @@ export default function LayoutDoAtelie({ perfil, paginas, children }) {
     }
   }
 
+  function abrirPerfil() {
+    setErro('');
+    setPerfilAberto(true);
+  }
+
   return (
     <div className="workspace">
       <a className="workspace-skip" href="#workspace-main">Ir para o conteúdo</a>
       <header className="workspace-sidebar">
         <div className="workspace-brand">
-          <div className="brand">
-            <span className="brand-name">Linho</span>
-            <span className="eyebrow">Gestão de ateliê</span>
-          </div>
-          <button type="button" className="workspace-perfil botao-secundario botao-com-icone"
-            aria-haspopup="dialog" onClick={() => {
-              setErro('');
-              setPerfilAberto(true);
-            }}>
-            <IconeNavegacao nome="perfil" /> <span>{perfil}</span>
+          <Marca />
+          <button type="button" className="workspace-perfil-chip botao-secundario" aria-haspopup="dialog" onClick={abrirPerfil}>
+            {perfil}
           </button>
         </div>
 
-        <div className="workspace-menu">
-          {paginas.length > 0 && (
-            <nav aria-label="Área de trabalho">
-              <ul>
-                {paginas.map(({ caminho, rotulo, rotuloCurto, icone }) => (
-                  <li key={caminho}>
-                    <NavLink to={caminho}>
-                      <IconeNavegacao nome={icone} />
-                      {rotuloCurto ? <>
-                        <span className="workspace-label-desktop">{rotulo}</span>
-                        <span className="workspace-label-mobile">{rotuloCurto}</span>
-                      </> : <span>{rotulo}</span>}
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          )}
-        </div>
+        {paginas.length > 0 && (
+          <nav className="workspace-menu" aria-label="Área de trabalho">
+            <span className="eyebrow workspace-secao">Espaço de trabalho</span>
+            <ul>
+              {paginas.map(({ caminho, rotulo, rotuloCurto, icone }) => (
+                <li key={caminho}>
+                  <NavLink to={caminho}>
+                    <Icone nome={icone} />
+                    {rotuloCurto ? <>
+                      <span className="workspace-label-desktop">{rotulo}</span>
+                      <span className="workspace-label-mobile">{rotuloCurto}</span>
+                    </> : <span>{rotulo}</span>}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
+
+        <button type="button" className="workspace-usuario" aria-haspopup="dialog" onClick={abrirPerfil}>
+          <span className="workspace-avatar" aria-hidden="true">{usuario.nome.trim().charAt(0)}</span>
+          <span className="workspace-usuario-texto">
+            <strong>{usuario.nome}</strong>
+            <span>{perfil}</span>
+          </span>
+          <Icone nome="avancar" />
+        </button>
       </header>
 
       {perfilAberto && (
         <Modal titulo="Meu perfil" aoFechar={() => setPerfilAberto(false)} ocupado={saindo}>
           <div className="workspace-account">
-            <strong>{usuario.nome}</strong>
-            <span>{usuario.email}</span>
-            <span>{perfil}</span>
+            <span className="workspace-avatar" aria-hidden="true">{usuario.nome.trim().charAt(0)}</span>
+            <div>
+              <strong>{usuario.nome}</strong>
+              <span>{usuario.email}</span>
+              <span>{perfil}</span>
+            </div>
           </div>
           {erro && <Aviso>{erro}</Aviso>}
           <div className="modal-acoes">
-            {usuario.perfil === 'ROLE_ADMIN' && <Link className="botao-link" to="/usuarios"
-              onClick={() => setPerfilAberto(false)}>Gerenciar usuários</Link>}
-            <button className="botao-secundario botao-com-icone" type="button" onClick={sairDaConta} disabled={saindo}>
-              <IconeNavegacao nome="sair" />
+            {usuario.perfil === 'ROLE_ADMIN' && <Link className="botao-link botao-secundario" to="/usuarios"
+              onClick={() => setPerfilAberto(false)}><Icone nome="clientes" /> Gerenciar usuários</Link>}
+            <button className="botao-com-icone" type="button" onClick={sairDaConta} disabled={saindo}>
+              <Icone nome="sair" />
               {saindo ? 'Saindo…' : 'Sair'}
             </button>
           </div>
         </Modal>
       )}
 
-      <main className="workspace-content" id="workspace-main" tabIndex={-1}>
-        <span className="eyebrow">{perfil}</span>
-        {children ?? <Outlet />}
-      </main>
+      <div className="workspace-area">
+        <div className="workspace-topo">
+          <nav aria-label="Você está em" className="workspace-trilha">
+            <span>Ateliê Lucinéia Padilha</span>
+            {pagina && <><Icone nome="avancar" />{emDetalhe
+              ? <><Link to={pagina.caminho}>{pagina.rotulo}</Link><Icone nome="avancar" /><strong>Detalhes</strong></>
+              : <strong>{pagina.rotulo}</strong>}</>}
+          </nav>
+          <span className="workspace-data">{dataDeHoje()}</span>
+        </div>
+        <main className="workspace-content" id="workspace-main" tabIndex={-1}>
+          {children ?? <Outlet />}
+        </main>
+      </div>
     </div>
   );
 }

@@ -2,12 +2,9 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Catalogo from '../../shared/Catalogo.jsx';
 import { api } from '../../shared/api.js';
-import { Aviso, Modal } from '../../shared/Interface.jsx';
+import { Aviso, Etiqueta, Modal } from '../../shared/Interface.jsx';
+import { dataHora, estadoDaOrdem, tiposFluxo } from '../../shared/formatos.js';
 
-const dataHora = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-const estados = { RESERVADA: 'Reservada', CONFECCAO: 'Confecção', PROVA: 'Prova', EM_PROVA: 'Em prova',
-  AJUSTES: 'Ajustes', PASSADORIA: 'Passadoria', CONCLUIDO: 'Concluída', RETIRADA: 'Retirada',
-  DEVOLVIDA: 'Devolvida', ENTREGUE: 'Entregue', CANCELADA: 'Cancelada' };
 
 function HistoricoCliente({ cliente }) {
   const [aberto, setAberto] = useState(false);
@@ -24,12 +21,18 @@ function HistoricoCliente({ cliente }) {
       {erro && <Aviso>Não foi possível consultar o histórico deste cliente.</Aviso>}
       {!ordens && !erro && <p role="status">Consultando histórico…</p>}
       {ordens && ordens.length === 0 && <p>Este cliente ainda não possui ordens de serviço.</p>}
-      {ordens?.length > 0 && <ul className="catalogo-lista" role="list">{ordens.map((ordem) => <li key={ordem.id}>
-        <h3>{ordem.tipoFluxo === 'LOCACAO' ? 'Locação' : 'Sob medida'} · {estados[ordem.statusAtual] || ordem.statusAtual}</h3>
-        <p>Ordem {ordem.id}</p>
-        <p>{ordem.inicioLocacao ? dataHora.format(new Date(ordem.inicioLocacao)) : ordem.dataEntrega ? dataHora.format(new Date(ordem.dataEntrega)) : 'Sem data informada'}</p>
-        <Link to={'/ordens-servico#' + ordem.id} onClick={() => setAberto(false)}>Abrir na lista de ordens</Link>
-      </li>)}</ul>}
+      {ordens?.length > 0 && <ul className="historico-ordens" role="list">{ordens.map((ordem) => {
+        const [estado, tom] = estadoDaOrdem(ordem.statusAtual);
+        const data = ordem.inicioLocacao || ordem.dataEntrega;
+        return <li key={ordem.id}>
+          <div>
+            <strong>{tiposFluxo[ordem.tipoFluxo] ?? ordem.tipoFluxo}</strong>
+            <span>{data ? dataHora.format(new Date(data)) : 'Sem data informada'}</span>
+          </div>
+          <Etiqueta tom={tom}>{estado}</Etiqueta>
+          <Link to={'/ordens-servico/' + ordem.id} onClick={() => setAberto(false)}>Abrir</Link>
+        </li>;
+      })}</ul>}
     </Modal>}
   </>;
 }
@@ -74,10 +77,10 @@ export default function ClientesPage({ titulo }) {
       })}
       acoesDoItem={(cliente) => <HistoricoCliente cliente={cliente} />}
       tituloDoItem={(cliente) => cliente.nome}
+      subtituloDoItem={(cliente) => cliente.email}
       detalhesDoItem={(cliente) => [
         ['CPF', cliente.cpf.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4')],
         ['Telefone', cliente.telefone],
-        ['E-mail', cliente.email],
       ]}
     />
   );

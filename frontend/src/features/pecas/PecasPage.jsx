@@ -3,16 +3,16 @@ import { ContextoDeAutenticacao } from '../auth/AuthContext.jsx';
 import Catalogo from '../../shared/Catalogo.jsx';
 import { Selecao } from '../../shared/Interface.jsx';
 import AcoesDaPeca from './AcoesDaPeca.jsx';
+import { moeda } from '../../shared/formatos.js';
 
 const tipos = { LOCACAO: 'Locação', SOB_MEDIDA: 'Sob medida' };
 const estados = {
-  DISPONIVEL: 'Disponível',
-  ALUGADA: 'Alugada',
-  EM_COSTURA: 'Em costura',
-  EM_LAVAGEM: 'Em lavagem',
-  MANUTENCAO: 'Manutenção',
+  DISPONIVEL: ['Disponível', 'verde'],
+  ALUGADA: ['Alugada', 'rosa'],
+  EM_COSTURA: ['Em costura', 'azul'],
+  EM_LAVAGEM: ['Em lavagem', 'roxo'],
+  MANUTENCAO: ['Manutenção', 'vermelho'],
 };
-const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export default function PecasPage({ titulo }) {
   const { usuario } = useContext(ContextoDeAutenticacao);
@@ -34,7 +34,7 @@ export default function PecasPage({ titulo }) {
           <Selecao rotulo="Tipo" valor={tipo} aoSelecionar={setTipo}
             opcoes={[[ '', 'Todos os tipos'], ...Object.entries(tipos)]} />
           <Selecao rotulo="Estado" valor={estado} aoSelecionar={setEstado}
-            opcoes={[[ '', 'Todos os estados'], ...Object.entries(estados)]} />
+            opcoes={[[ '', 'Todos os estados'], ...Object.entries(estados).map(([chave, [rotulo]]) => [chave, rotulo])]} />
         </>
       }
       campos={
@@ -71,11 +71,11 @@ export default function PecasPage({ titulo }) {
         setEstado('');
       }}
       tituloDoItem={(peca) => peca.descricao}
+      subtituloDoItem={(peca) => peca.codigoEtiqueta}
+      etiquetaDoItem={(peca) => estados[peca.status] ?? [peca.status, 'neutro']}
       acoesDoItem={(peca, aoAtualizar) => <AcoesDaPeca peca={peca} aoAtualizar={aoAtualizar} />}
       detalhesDoItem={(peca) => [
-        ['Etiqueta', peca.codigoEtiqueta],
         ['Tipo', tipos[peca.tipo] || peca.tipo],
-        ['Estado', estados[peca.status] || peca.status],
         ['Tamanho', peca.tamanho],
         ['Cor', peca.cor],
         ...(!ehProducao ? [['Valor base', peca.valorBase == null ? null : moeda.format(peca.valorBase)]] : []),

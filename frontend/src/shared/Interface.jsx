@@ -1,19 +1,46 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import {
+  ArrowDownLeft, ArrowLeft, ArrowUpRight, CalendarDays, ChevronDown, ChevronRight, CircleAlert, CircleCheck, ClipboardList,
+  Clock, LayoutGrid, LogOut, Plus, Scissors, Search, Shirt, Target, UserRound, Users, Wallet, X,
+} from 'lucide-react';
 
-const desenhos = {
-  adicionar: 'M12 5v14 M5 12h14',
-  fechar: 'M6 6l12 12 M18 6L6 18',
-  seta: 'm6 9 6 6 6-6',
-  aviso: 'M12 8v4 M12 16h.01 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z',
-  sucesso: 'm7 12 3 3 7-7 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z',
+const icones = {
+  adicionar: Plus, fechar: X, seta: ChevronDown, avancar: ChevronRight, aviso: CircleAlert, sucesso: CircleCheck,
+  busca: Search, painel: LayoutGrid, clientes: Users, pecas: Shirt, ordens: ClipboardList, financeiro: Wallet,
+  costura: Scissors, perfil: UserRound, sair: LogOut, agenda: CalendarDays, prazo: Clock, meta: Target,
+  entrada: ArrowDownLeft, saida: ArrowUpRight, voltar: ArrowLeft,
 };
 
 export function Icone({ nome }) {
+  const Desenho = icones[nome];
+  return <Desenho className="icone" strokeWidth={1.75} aria-hidden="true" />;
+}
+
+export function Marca() {
   return (
-    <svg className="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d={desenhos[nome]} />
-    </svg>
+    <span className="marca">
+      <span className="marca-logo"><Icone nome="costura" /></span>
+      <span>
+        <span className="marca-nome">Linho</span>
+        <span className="eyebrow">Gestão de ateliê</span>
+      </span>
+    </span>
+  );
+}
+
+export function Etiqueta({ tom = 'neutro', children }) {
+  return <span className={'etiqueta etiqueta-' + tom}>{children}</span>;
+}
+
+export function CabecalhoPagina({ titulo, descricao, id, children }) {
+  return (
+    <header className="cabecalho-pagina">
+      <div>
+        <h1 id={id}>{titulo}</h1>
+        {descricao && <p className="intro">{descricao}</p>}
+      </div>
+      {children}
+    </header>
   );
 }
 

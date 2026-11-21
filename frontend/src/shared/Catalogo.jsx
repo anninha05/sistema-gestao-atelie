@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { api, enviarComCsrf, requisitarComCsrf } from './api.js';
-import { Aviso, Icone, Modal, validarCampos } from './Interface.jsx';
+import { Aviso, CabecalhoPagina, Etiqueta, Icone, Modal, validarCampos } from './Interface.jsx';
 import './styles/catalogo.css';
 
 export default function Catalogo({
   titulo, descricao, caminho, rotuloCadastro, rotuloBusca, correspondeABusca, filtros,
   campos, montarDados, tituloDoItem, detalhesDoItem, acoesDoItem, aoCadastrar, validar, cadastroDesabilitado = false, abrirAoEntrar = false,
-  camposEdicao, montarDadosEdicao,
+  camposEdicao, montarDadosEdicao, etiquetaDoItem, subtituloDoItem, secao = false,
 }) {
   const [itens, setItens] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -99,22 +99,28 @@ export default function Catalogo({
 
   const itensVisiveis = itens.filter((registro) => correspondeABusca(registro, busca.trim()));
 
+  const botaoCadastro = (
+    <button type="button" className="botao-com-icone" aria-haspopup="dialog"
+      disabled={carregando || erroAoCarregar || salvando || cadastroDesabilitado} onClick={() => {
+        setCadastroAberto(true);
+        setErroAoSalvar('');
+        setConfirmacao('');
+      }}>
+      <Icone nome="adicionar" /> {rotuloCadastro}
+    </button>
+  );
+  const TituloItem = secao ? 'h3' : 'h2';
+
   return (
-    <section className="catalogo" aria-labelledby="catalogo-title">
-      <div className="catalogo-header">
-        <div>
-          <h1 id="catalogo-title">{titulo}</h1>
-          <p className="intro">{descricao}</p>
-        </div>
-        <button type="button" className="botao-com-icone" aria-haspopup="dialog"
-          disabled={carregando || erroAoCarregar || salvando || cadastroDesabilitado} onClick={() => {
-            setCadastroAberto(true);
-            setErroAoSalvar('');
-            setConfirmacao('');
-          }}>
-          <Icone nome="adicionar" /> {rotuloCadastro}
-        </button>
-      </div>
+    <section className={'catalogo' + (secao ? ' catalogo-secao' : '')} aria-labelledby="catalogo-title">
+      {secao ? (
+        <header className="cabecalho-pagina">
+          <div><h2 id="catalogo-title">{titulo}</h2><p className="intro">{descricao}</p></div>
+          {botaoCadastro}
+        </header>
+      ) : (
+        <CabecalhoPagina id="catalogo-title" titulo={titulo} descricao={descricao}>{botaoCadastro}</CabecalhoPagina>
+      )}
 
       {cadastroAberto && !carregando && !erroAoCarregar && !cadastroDesabilitado && (
         <Modal titulo={rotuloCadastro} aoFechar={fecharCadastro} ocupado={salvando}>
@@ -144,43 +150,54 @@ export default function Catalogo({
       )}
       {confirmacao && <Aviso tipo="sucesso">{confirmacao}</Aviso>}
 
-      <div className="catalogo-filtros">
-        <label>
-          {rotuloBusca}
-          <input type="search" value={busca} onChange={(evento) => setBusca(evento.target.value)} />
+      <div className="catalogo-barra">
+        <label className="catalogo-busca">
+          <span className="sr-only">{rotuloBusca}</span>
+          <Icone nome="busca" />
+          <input type="search" placeholder={rotuloBusca} value={busca} onChange={(evento) => setBusca(evento.target.value)} />
         </label>
         {filtros}
+        {!carregando && !erroAoCarregar && (
+          <p className="catalogo-total">{itensVisiveis.length} {itensVisiveis.length === 1 ? 'registro' : 'registros'}</p>
+        )}
       </div>
 
-      {carregando && <p role="status">Carregando…</p>}
+      {carregando && <p className="catalogo-vazio" role="status">Carregando…</p>}
       {erroAoCarregar && (
         <div>
           <Aviso>Não foi possível carregar a lista.</Aviso>
           <button type="button" onClick={tentarNovamente}>Tentar novamente</button>
         </div>
       )}
-      {!carregando && !erroAoCarregar && (
-        <>
-          <p className="catalogo-total">{itensVisiveis.length} {itensVisiveis.length === 1 ? 'registro' : 'registros'}</p>
-          {itensVisiveis.length === 0 ? (
-            <p>{itens.length === 0 ? 'Nenhum cadastro por enquanto.' : 'Nenhum registro corresponde aos filtros.'}</p>
-          ) : (
-            <ul className="catalogo-lista" role="list">
-              {itensVisiveis.map((registro) => (
-                <li key={registro.id} id={registro.id}>
-                  <h2>{tituloDoItem(registro)}</h2>
-                  <dl>{detalhesDoItem(registro).map(([rotulo, valor]) => (
-                    <div key={rotulo}><dt>{rotulo}</dt><dd>{valor ?? '—'}</dd></div>
-                  ))}</dl>
+      {!carregando && !erroAoCarregar && (itensVisiveis.length === 0 ? (
+        <p className="catalogo-vazio">{itens.length === 0 ? 'Nenhum cadastro por enquanto.' : 'Nenhum registro corresponde aos filtros.'}</p>
+      ) : (
+        <ul className="catalogo-lista" role="list">
+          {itensVisiveis.map((registro) => {
+            const etiqueta = etiquetaDoItem?.(registro);
+            const subtitulo = subtituloDoItem?.(registro);
+            return (
+              <li key={registro.id} id={registro.id} className="cartao catalogo-item">
+                <div className="catalogo-item-topo">
+                  <div>
+                    <TituloItem>{tituloDoItem(registro)}</TituloItem>
+                    {subtitulo && <span className="catalogo-item-subtitulo">{subtitulo}</span>}
+                  </div>
+                  {etiqueta && <Etiqueta tom={etiqueta[1]}>{etiqueta[0]}</Etiqueta>}
+                </div>
+                <dl>{detalhesDoItem(registro).filter(([, valor]) => valor != null && valor !== '').map(([rotulo, valor]) => (
+                  <div key={rotulo}><dt>{rotulo}</dt><dd>{valor}</dd></div>
+                ))}</dl>
+                <div className="catalogo-item-acoes">
                   {camposEdicao && !cadastroDesabilitado && <button type="button" className="botao-secundario"
                     onClick={() => { setErroAoSalvar(''); setItemEmEdicao(registro); }}>Editar</button>}
                   {acoesDoItem?.(registro, atualizarItem)}
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
-      )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ))}
     </section>
   );
 }

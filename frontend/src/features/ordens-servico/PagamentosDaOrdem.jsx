@@ -66,7 +66,7 @@ function ConteudoPagamentos({ ordem, aoFechar, aoAtualizarOrdem }) {
     <Modal titulo={'Pagamentos de ' + ordem.clienteNome} aoFechar={aoFechar} ocupado={salvando}>
       {erro && <Aviso>{erro}</Aviso>}
       {!pagamento && !erro && <p role="status">Consultando pagamentos…</p>}
-      <button type="button" className="botao-secundario" disabled={salvando || consultando} onClick={() => {
+      <button type="button" className="botao-secundario pagamento-atualizar" disabled={salvando || consultando} onClick={() => {
         setErro('');
         setConfirmacao('');
         setConsultando(true);
@@ -75,17 +75,17 @@ function ConteudoPagamentos({ ordem, aoFechar, aoAtualizarOrdem }) {
       {confirmacao && <Aviso tipo="sucesso">{confirmacao}</Aviso>}
       {pagamento && <>
         {pagamento.saldoDevedor === 0 && <p>Esta ordem está quitada. Todos os recebimentos estão no histórico abaixo.</p>}
-        <dl>
-          <dt>Total</dt><dd>{moeda.format(pagamento.valorTotal)}</dd>
-          <dt>Recebido</dt><dd>{moeda.format(pagamento.valorPago)}</dd>
-          <dt>Saldo devedor</dt><dd>{moeda.format(pagamento.saldoDevedor)}</dd>
-          <dt>Situação</dt><dd>{situacoes[pagamento.statusFinanceiro]}</dd>
+        <dl className="pagamento-resumo">
+          <div><dt>Total</dt><dd>{moeda.format(pagamento.valorTotal)}</dd></div>
+          <div><dt>Recebido</dt><dd>{moeda.format(pagamento.valorPago)}</dd></div>
+          <div className="pagamento-saldo"><dt>Saldo devedor</dt><dd>{moeda.format(pagamento.saldoDevedor)}</dd></div>
+          <div><dt>Situação</dt><dd>{situacoes[pagamento.statusFinanceiro]}</dd></div>
         </dl>
         <h3>Histórico de recebimentos</h3>
-        {pagamento.recebimentos.length === 0 && <p>Nenhum recebimento registrado.</p>}
-        <ul>{pagamento.recebimentos.map((item) => (
-          <li key={item.id}>{item.data.split('-').reverse().join('/')} · {moeda.format(item.valor)} · {metodos.find(([valor]) => valor === item.metodo)?.[1]}
-            {item.sinal ? ' · Sinal' : ''} <button type="button" className="botao-secundario"
+        {pagamento.recebimentos.length === 0 && <p className="pagamento-vazio">Nenhum recebimento registrado.</p>}
+        <ul className="pagamento-historico">{pagamento.recebimentos.map((item) => (
+          <li key={item.id}><span>{item.data.split('-').reverse().join('/')} · {moeda.format(item.valor)} · {metodos.find(([valor]) => valor === item.metodo)?.[1]}
+            {item.sinal ? ' · Sinal' : ''}</span> <button type="button" className="botao-secundario"
               disabled={baixandoRecibo === item.id} onClick={async () => {
                 setBaixandoRecibo(item.id); setErro('');
                 try { await baixarPdf(caminho + '/' + item.id + '/recibo.pdf', 'recibo-' + item.id + '.pdf'); }
@@ -117,10 +117,13 @@ function ConteudoPagamentos({ ordem, aoFechar, aoAtualizarOrdem }) {
   );
 }
 
-export default function PagamentosDaOrdem({ ordem, aoAtualizar }) {
+export default function PagamentosDaOrdem({ ordem, aoAtualizar, aoFechar, rotulo = 'Pagamentos e saldo' }) {
   const [aberto, setAberto] = useState(false);
   return <>
-    <button className="botao-secundario" type="button" aria-haspopup="dialog" onClick={() => setAberto(true)}>Pagamentos e saldo</button>
-    {aberto && <ConteudoPagamentos ordem={ordem} aoFechar={() => setAberto(false)} aoAtualizarOrdem={aoAtualizar} />}
+    <button className="botao-secundario" type="button" aria-haspopup="dialog" onClick={() => setAberto(true)}>{rotulo}</button>
+    {aberto && <ConteudoPagamentos ordem={ordem} aoAtualizarOrdem={aoAtualizar} aoFechar={() => {
+      setAberto(false);
+      aoFechar?.();
+    }} />}
   </>;
 }
