@@ -1,5 +1,6 @@
 package com.atelie.sistema.precificacao;
 
+import com.atelie.sistema.shared.exception.RegraNegocioException;
 import com.atelie.sistema.usuario.Usuario;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -69,10 +70,17 @@ public class SugestaoPreco {
     @Column(name = "criada_em", nullable = false)
     private LocalDateTime criadaEm;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "aprovada_por_id")
+    private Usuario aprovadaPor;
+
+    @Column(name = "aprovada_em")
+    private LocalDateTime aprovadaEm;
+
     protected SugestaoPreco() {}
 
     public SugestaoPreco(UUID ordemServicoId, UUID clienteId, Long execucaoPidId,
-            CalculoSugestaoPreco calculo, Usuario responsavel) {
+            CalculadoraSugestaoPreco.Calculo calculo, Usuario responsavel) {
         if (ordemServicoId == null || clienteId == null || calculo == null || responsavel == null)
             throw new IllegalArgumentException("Informe a ordem, o cliente, o cálculo e quem gerou a sugestão.");
         this.ordemServicoId = ordemServicoId;
@@ -93,6 +101,13 @@ public class SugestaoPreco {
         this.criadaEm = LocalDateTime.now();
     }
 
+    public void aprovar(Usuario gerente) {
+        if (gerente == null) throw new RegraNegocioException("Informe quem aprovou a sugestão.");
+        if (aprovadaEm != null) throw new RegraNegocioException("Esta sugestão já foi aprovada.");
+        this.aprovadaPor = gerente;
+        this.aprovadaEm = LocalDateTime.now();
+    }
+
     public Long getId() { return id; }
     public UUID getOrdemServicoId() { return ordemServicoId; }
     public UUID getClienteId() { return clienteId; }
@@ -110,4 +125,6 @@ public class SugestaoPreco {
     public String getJustificativa() { return justificativa; }
     public Usuario getResponsavel() { return responsavel; }
     public LocalDateTime getCriadaEm() { return criadaEm; }
+    public Usuario getAprovadaPor() { return aprovadaPor; }
+    public LocalDateTime getAprovadaEm() { return aprovadaEm; }
 }

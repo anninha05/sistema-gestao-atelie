@@ -137,14 +137,14 @@ class SistemaApplicationTests {
         mvc.perform(put("/precificacao/metas/" + mes).session(admin).header("X-CSRF-TOKEN", token)
                 .contentType("application/json")
                 .content("""
-                        {"valorMeta":12500.00,"indicador":"RESULTADO_DE_CAIXA"}
+                        {"valorMeta":12500.00}
                         """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.mes").value(mes))
                 .andExpect(jsonPath("$.valorMeta").value(12500.00))
                 .andExpect(jsonPath("$.responsavelNome").value("Teste retirada"));
         mvc.perform(get("/precificacao/metas/" + mes).session(admin))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.indicador").value("RESULTADO_DE_CAIXA"));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.valorMeta").value(12500.00));
 
         token = obterToken(admin);
         mvc.perform(put("/precificacao/politica").session(admin).header("X-CSRF-TOKEN", token)
@@ -200,7 +200,7 @@ class SistemaApplicationTests {
                 .header("X-CSRF-TOKEN", obterToken(producao)).contentType("application/json")
                 .content("{}"))
                 .andExpect(status().isForbidden());
-        mvc.perform(post("/precificacao/atualizacao-diaria").session(producao)
+        mvc.perform(post("/precificacao/politica/calibrar").session(producao)
                 .header("X-CSRF-TOKEN", obterToken(producao)))
                 .andExpect(status().isForbidden());
     }
@@ -209,51 +209,32 @@ class SistemaApplicationTests {
     void atualizacaoPidDiariaEIdempotenteEAuditavel() throws Exception {
         var admin = autenticar(Perfil.ROLE_ADMIN);
         var mesAtual = java.time.YearMonth.now();
-        var token = obterToken(admin);
-        mvc.perform(put("/precificacao/metas/" + mesAtual).session(admin).header("X-CSRF-TOKEN", token)
-                .contentType("application/json")
-                .content("""
-                        {"valorMeta":10000.00,"indicador":"RESULTADO_DE_CAIXA"}
-                        """))
+        mvc.perform(put("/precificacao/metas/" + mesAtual).session(admin).header("X-CSRF-TOKEN", obterToken(admin))
+                .contentType("application/json").content("{\"valorMeta\":10000.00}"))
                 .andExpect(status().isOk());
-        token = obterToken(admin);
-        mvc.perform(put("/precificacao/politica").session(admin).header("X-CSRF-TOKEN", token)
+        mvc.perform(put("/precificacao/politica").session(admin).header("X-CSRF-TOKEN", obterToken(admin))
                 .contentType("application/json")
                 .content("""
                         {"ganhoProporcional":0.1,"ganhoIntegral":0.01,"ganhoDerivativo":0.1,
-                         "ajusteMinimo":-0.05,"ajusteMaximo":0.05,
-                         "descontoFidelidade":null,"quantidadeOsFidelidade":null}
+                         "ajusteMinimo":-0.05,"ajusteMaximo":0.05}
                         """))
                 .andExpect(status().isOk());
-
-        token = obterToken(admin);
-        // Salvar a meta já aciona o acompanhamento; a atualização manual posterior deve reutilizá-lo.
-        mvc.perform(put("/precificacao/metas/" + mesAtual).session(admin).header("X-CSRF-TOKEN", token)
-                .contentType("application/json")
-                .content("{\"valorMeta\":10000.00,\"indicador\":\"RESULTADO_DE_CAIXA\"}"))
+        mvc.perform(put("/precificacao/metas/" + mesAtual).session(admin).header("X-CSRF-TOKEN", obterToken(admin))
+                .contentType("application/json").content("{\"valorMeta\":10000.00}"))
                 .andExpect(status().isOk());
+
         assertEquals(1, jdbc.queryForObject(
                 "select count(*) from precificacao_execucoes_pid where competencia = ? and data_apuracao = ?",
                 Integer.class, mesAtual.atDay(1), LocalDate.now()));
-        var primeira = mvc.perform(post("/precificacao/atualizacao-diaria").session(admin)
-                .header("X-CSRF-TOKEN", token)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.mes").value(mesAtual.toString()))
-                .andExpect(jsonPath("$.dataApuracao").value(LocalDate.now().toString()))
-                .andExpect(jsonPath("$.referenciaAcumulada").exists())
-                .andExpect(jsonPath("$.ajusteLimitado").exists()).andReturn();
-        long idPrimeira = json.readTree(primeira.getResponse().getContentAsString()).get("id").asLong();
-        var segunda = mvc.perform(post("/precificacao/atualizacao-diaria").session(admin)
-                .header("X-CSRF-TOKEN", token)).andExpect(status().isOk()).andReturn();
-        long idSegunda = json.readTree(segunda.getResponse().getContentAsString()).get("id").asLong();
-
-        assertEquals(idPrimeira, idSegunda);
         mvc.perform(get("/precificacao/atualizacoes").session(admin).param("mes", mesAtual.toString()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(idPrimeira))
-                .andExpect(jsonPath("$[0].responsavelNome").value("Teste retirada"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].dataApuracao").value(LocalDate.now().toString()))
+                .andExpect(jsonPath("$[0].referenciaAcumulada").exists())
+                .andExpect(jsonPath("$[0].ajusteLimitado").exists());
     }
 
     @Test
-    void simulaERegistraSugestaoSemAlterarValorDaOrdem() throws Exception {
+    void registraSugestaoSemAlterarValorDaOrdem() throws Exception {
         var cliente = clientes.cadastrarCliente(new ClienteRequestDTO("Cliente PID", "22999999999",
                 "pid-" + UUID.randomUUID() + "@email.com", gerarCpfParaTeste()));
         var peca = pecas.cadastrarPeca(new PecaRequestDTO("Peça PID", TipoFluxo.LOCACAO,
@@ -263,35 +244,22 @@ class SistemaApplicationTests {
                 null, null, null, null, LocalDateTime.now().plusDays(11), null));
         var valorOriginal = ordem.valorTotal();
         var admin = autenticar(Perfil.ROLE_ADMIN);
-        var token = obterToken(admin);
-        mvc.perform(put("/precificacao/politica").session(admin).header("X-CSRF-TOKEN", token)
+        mvc.perform(put("/precificacao/politica").session(admin).header("X-CSRF-TOKEN", obterToken(admin))
                 .contentType("application/json")
                 .content("""
                         {"ganhoProporcional":0.1,"ganhoIntegral":0,"ganhoDerivativo":0,
-                         "ajusteMinimo":-0.05,"ajusteMaximo":0.05,
-                         "descontoFidelidade":null,"quantidadeOsFidelidade":null}
+                         "ajusteMinimo":-0.05,"ajusteMaximo":0.05}
                         """))
                 .andExpect(status().isOk());
 
-        String pedido = "{\"ordemServicoId\":\"" + ordem.id() + "\",\"pisoMinimo\":100.00}";
-        token = obterToken(admin);
-        var simulacao = mvc.perform(post("/precificacao/simular").session(admin).header("X-CSRF-TOKEN", token)
-                .contentType("application/json").content(pedido))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.id").doesNotExist())
-                .andExpect(jsonPath("$.precoBase").value(150.00))
-                .andExpect(jsonPath("$.precoSugerido").exists()).andReturn();
-        assertEquals(valorOriginal, ordens.buscarPorId(ordem.id()).valorTotal());
-
-        token = obterToken(admin);
-        var criada = mvc.perform(post("/precificacao/sugestoes").session(admin).header("X-CSRF-TOKEN", token)
-                .contentType("application/json").content(pedido))
+        mvc.perform(post("/precificacao/sugestoes").session(admin).header("X-CSRF-TOKEN", obterToken(admin))
+                        .contentType("application/json")
+                        .content("{\"ordemServicoId\":\"" + ordem.id() + "\",\"pisoMinimo\":100.00}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.id").isNumber())
-                .andExpect(jsonPath("$.justificativa").isNotEmpty()).andReturn();
-        long id = json.readTree(criada.getResponse().getContentAsString()).get("id").asLong();
-        mvc.perform(get("/precificacao/sugestoes/" + id).session(admin))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.ordemServicoId").value(ordem.id().toString()));
+                .andExpect(jsonPath("$.precoBase").value(150.00))
+                .andExpect(jsonPath("$.justificativa").isNotEmpty())
+                .andExpect(jsonPath("$.aprovadaEm").isEmpty());
         assertEquals(valorOriginal, ordens.buscarPorId(ordem.id()).valorTotal());
-        assertTrue(json.readTree(simulacao.getResponse().getContentAsString()).get("id").isNull());
     }
 
     @Test
@@ -307,69 +275,46 @@ class SistemaApplicationTests {
                 LocalDate.now(), MetodoPagamento.PIX));
 
         var admin = autenticar(Perfil.ROLE_ADMIN);
-        var token = obterToken(admin);
-        mvc.perform(put("/precificacao/politica").session(admin).header("X-CSRF-TOKEN", token)
+        mvc.perform(put("/precificacao/politica").session(admin).header("X-CSRF-TOKEN", obterToken(admin))
                 .contentType("application/json")
                 .content("""
                         {"ganhoProporcional":0,"ganhoIntegral":0,"ganhoDerivativo":0,
-                         "ajusteMinimo":-0.20,"ajusteMaximo":0.20,
-                         "descontoFidelidade":null,"quantidadeOsFidelidade":null}
+                         "ajusteMinimo":-0.20,"ajusteMaximo":0.20}
                         """))
                 .andExpect(status().isOk());
-        var criar = "{\"ordemServicoId\":\"" + ordem.id() + "\",\"pisoMinimo\":180.00}";
-        token = obterToken(admin);
-        var criada = mvc.perform(post("/precificacao/sugestoes").session(admin).header("X-CSRF-TOKEN", token)
-                .contentType("application/json").content(criar))
+        var criada = mvc.perform(post("/precificacao/sugestoes").session(admin).header("X-CSRF-TOKEN", obterToken(admin))
+                        .contentType("application/json")
+                        .content("{\"ordemServicoId\":\"" + ordem.id() + "\",\"pisoMinimo\":180.00}"))
                 .andExpect(status().isOk()).andReturn();
         long sugestaoId = json.readTree(criada.getResponse().getContentAsString()).get("id").asLong();
+        var aprovar = "/precificacao/sugestoes/" + sugestaoId + "/aprovar";
 
-        token = obterToken(admin);
-        mvc.perform(post("/ordens-servico/" + ordem.id() + "/aprovar-preco").session(admin)
-                .header("X-CSRF-TOKEN", token).contentType("application/json")
-                .content("{\"sugestaoId\":" + sugestaoId + "}"))
+        for (var perfil : List.of(Perfil.ROLE_ATENDENTE, Perfil.ROLE_PRODUCAO)) {
+            var sessao = autenticar(perfil);
+            mvc.perform(post(aprovar).session(sessao).header("X-CSRF-TOKEN", obterToken(sessao)))
+                    .andExpect(status().isForbidden());
+        }
+        assertEquals(new BigDecimal("150.00"), ordens.buscarPorId(ordem.id()).valorTotal());
+
+        mvc.perform(post(aprovar).session(admin).header("X-CSRF-TOKEN", obterToken(admin)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.valorAnterior").value(150.00))
-                .andExpect(jsonPath("$.valorAprovado").value(180.00))
-                .andExpect(jsonPath("$.valorRecebido").value(40.00))
-                .andExpect(jsonPath("$.responsavelNome").value("Teste retirada"));
+                .andExpect(jsonPath("$.precoBase").value(150.00))
+                .andExpect(jsonPath("$.precoSugerido").value(180.00))
+                .andExpect(jsonPath("$.aprovadaPorNome").value("Teste retirada"))
+                .andExpect(jsonPath("$.aprovadaEm").isNotEmpty());
         assertEquals(new BigDecimal("180.00"), ordens.buscarPorId(ordem.id()).valorTotal());
         mvc.perform(get("/ordens-servico/" + ordem.id() + "/pagamentos").session(admin))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.valorTotal").value(180.00))
                 .andExpect(jsonPath("$.valorPago").value(40.00)).andExpect(jsonPath("$.saldoDevedor").value(140.00));
-        assertEquals(1, jdbc.queryForObject("select count(*) from precificacao_aprovacoes where sugestao_id = ?",
-                Integer.class, sugestaoId));
 
-        token = obterToken(admin);
-        mvc.perform(post("/ordens-servico/" + ordem.id() + "/aprovar-preco").session(admin)
-                .header("X-CSRF-TOKEN", token).contentType("application/json")
-                .content("{\"sugestaoId\":" + sugestaoId + "}"))
+        mvc.perform(post(aprovar).session(admin).header("X-CSRF-TOKEN", obterToken(admin)))
                 .andExpect(status().isBadRequest());
-        assertEquals(1, jdbc.queryForObject("select count(*) from precificacao_aprovacoes where sugestao_id = ?",
-                Integer.class, sugestaoId));
-
-        var outraPeca = pecas.cadastrarPeca(new PecaRequestDTO("Peça outra ordem", TipoFluxo.LOCACAO,
-                new BigDecimal("125.00"), "M", "Azul"));
-        var outra = ordens.abrirOrdemServico(new OrdemServicoRequestDTO(cliente.id(), TipoFluxo.LOCACAO,
-                List.of(outraPeca.id()), null, LocalDateTime.now().plusDays(20), LocalDateTime.now().plusDays(22),
-                null, null, null, null, LocalDateTime.now().plusDays(21), null));
-        token = obterToken(admin);
-        mvc.perform(post("/ordens-servico/" + outra.id() + "/aprovar-preco").session(admin)
-                .header("X-CSRF-TOKEN", token).contentType("application/json")
-                .content("{\"sugestaoId\":" + sugestaoId + "}"))
-                .andExpect(status().isBadRequest());
-        assertEquals(new BigDecimal("125.00"), ordens.buscarPorId(outra.id()).valorTotal());
-
-        var producao = autenticar(Perfil.ROLE_PRODUCAO);
-        mvc.perform(post("/ordens-servico/" + outra.id() + "/aprovar-preco").session(producao)
-                .header("X-CSRF-TOKEN", obterToken(producao)).contentType("application/json")
-                .content("{\"sugestaoId\":" + sugestaoId + "}"))
-                .andExpect(status().isForbidden());
+        assertEquals(new BigDecimal("180.00"), ordens.buscarPorId(ordem.id()).valorTotal());
     }
 
     @Test
     @org.springframework.transaction.annotation.Transactional
-    void fluxoSimplificadoCadastraMinimoSugereSemAlterarEConfirma() throws Exception {
-        // Remove somente a configuração dentro da transação de teste, revertida ao final.
+    void fluxoSimplificadoCriaPoliticaExigeMinimoSugereEConfirma() throws Exception {
         jdbc.update("delete from precificacao_politica");
         var cliente = clientes.cadastrarCliente(new ClienteRequestDTO("Cliente sugestão simples", "22999999999",
                 "simples-" + UUID.randomUUID() + "@email.com", gerarCpfParaTeste()));
@@ -383,45 +328,42 @@ class SistemaApplicationTests {
         mvc.perform(put("/precificacao/metas/" + java.time.YearMonth.now()).session(admin)
                 .header("Origin", "http://localhost:5173")
                 .header("X-CSRF-TOKEN", token).contentType("application/json")
-                .content("{\"valorMeta\":5000,\"indicador\":\"RESULTADO_DE_CAIXA\"}"))
+                .content("{\"valorMeta\":5000}"))
                 .andExpect(status().isOk());
         mvc.perform(get("/precificacao/politica").session(admin))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.ajusteMinimo").value(-0.20))
                 .andExpect(jsonPath("$.ajusteMaximo").value(0.20));
-        String pedido = "{\"ordemServicoId\":\"" + ordem.id() + "\"}";
-        token = obterToken(admin);
+
         mvc.perform(post("/precificacao/sugestoes").session(admin).header("X-CSRF-TOKEN", token)
-                .contentType("application/json").content(pedido)).andExpect(status().isBadRequest());
-        String caminhoPiso = "/precificacao/ordens/" + ordem.id() + "/preco-minimo";
-        mvc.perform(put(caminhoPiso).session(admin).header("Origin", "http://localhost:5173").header("X-CSRF-TOKEN", token)
-                .contentType("application/json").content("{\"valor\":0}")).andExpect(status().isBadRequest());
-        mvc.perform(put(caminhoPiso).session(admin).header("Origin", "http://localhost:5173").header("X-CSRF-TOKEN", token)
-                .contentType("application/json").content("{\"valor\":120}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.valor").value(120));
-        mvc.perform(get(caminhoPiso).session(admin)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.valor").value(120));
+                .contentType("application/json").content("{\"ordemServicoId\":\"" + ordem.id() + "\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/precificacao/sugestoes").session(admin).header("X-CSRF-TOKEN", token)
+                .contentType("application/json")
+                .content("{\"ordemServicoId\":\"" + ordem.id() + "\",\"pisoMinimo\":0}"))
+                .andExpect(status().isBadRequest());
         var gerada = mvc.perform(post("/precificacao/sugestoes").session(admin).header("X-CSRF-TOKEN", token)
-                .contentType("application/json").content(pedido)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.pisoMinimo").value(120)).andReturn();
+                        .contentType("application/json")
+                        .content("{\"ordemServicoId\":\"" + ordem.id() + "\",\"pisoMinimo\":120}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.pisoMinimo").value(120)).andReturn();
         var resultado = json.readTree(gerada.getResponse().getContentAsString());
-        long sugestaoId = resultado.get("id").asLong();
         var sugerido = new BigDecimal(resultado.get("precoSugerido").asString());
         assertTrue(sugerido.compareTo(new BigDecimal("120")) >= 0);
         assertEquals(new BigDecimal("150.00"), ordens.buscarPorId(ordem.id()).valorTotal());
-        mvc.perform(post("/ordens-servico/" + ordem.id() + "/aprovar-preco").session(admin)
-                .header("X-CSRF-TOKEN", token).contentType("application/json")
-                .content("{\"sugestaoId\":" + sugestaoId + "}"))
+
+        mvc.perform(post("/precificacao/sugestoes/" + resultado.get("id").asLong() + "/aprovar").session(admin)
+                .header("X-CSRF-TOKEN", token))
                 .andExpect(status().isOk());
         assertEquals(0, sugerido.compareTo(ordens.buscarPorId(ordem.id()).valorTotal()));
     }
 
     @Test
-    void precoMinimoSoPodeSerCadastradoPelaGerencia() throws Exception {
+    void sugestaoDePrecoEhExclusivaDaGerencia() throws Exception {
         for (var perfil : List.of(Perfil.ROLE_ATENDENTE, Perfil.ROLE_PRODUCAO)) {
             var sessao = autenticar(perfil);
-            mvc.perform(put("/precificacao/ordens/" + UUID.randomUUID() + "/preco-minimo").session(sessao)
+            mvc.perform(post("/precificacao/sugestoes").session(sessao)
                     .header("X-CSRF-TOKEN", obterToken(sessao)).contentType("application/json")
-                    .content("{\"valor\":100}")).andExpect(status().isForbidden());
+                    .content("{\"ordemServicoId\":\"" + UUID.randomUUID() + "\",\"pisoMinimo\":100}"))
+                    .andExpect(status().isForbidden());
         }
     }
 

@@ -7,13 +7,20 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class CalculadoraSugestaoPreco {
-    public CalculoSugestaoPreco calcular(BigDecimal precoBase, double ajustePid, BigDecimal descontoFidelidade,
+
+    public record Calculo(BigDecimal precoBase, double ajustePid, BigDecimal precoAjustado,
+            BigDecimal descontoFidelidade, BigDecimal precoAposFidelidade, BigDecimal pisoMinimo,
+            BigDecimal precoSugerido, int ordensConcluidas, int ordensCanceladas,
+            boolean elegivelFidelidade, String justificativa) {
+    }
+
+    public Calculo calcular(BigDecimal precoBase, double ajustePid, BigDecimal descontoFidelidade,
             Integer minimoOrdensFidelidade, int ordensConcluidas, int ordensCanceladas, BigDecimal pisoMinimo) {
         return calcular(precoBase, ajustePid, descontoFidelidade, minimoOrdensFidelidade,
                 ordensConcluidas, ordensCanceladas, pisoMinimo, null, null);
     }
 
-    public CalculoSugestaoPreco calcular(BigDecimal precoBase, double ajustePid, BigDecimal descontoFidelidade,
+    public Calculo calcular(BigDecimal precoBase, double ajustePid, BigDecimal descontoFidelidade,
             Integer minimoOrdensFidelidade, int ordensConcluidas, int ordensCanceladas, BigDecimal pisoMinimo,
             Double ajusteMinimo, Double ajusteMaximo) {
         if (precoBase == null || precoBase.signum() <= 0 || !Double.isFinite(ajustePid)
@@ -58,7 +65,7 @@ public class CalculadoraSugestaoPreco {
                 + "Piso informado pela gerência: " + moeda(piso) + "; preço sugerido: " + moeda(sugerido) + "."
                 + (ordensCanceladas > 0 ? " Histórico contém " + ordensCanceladas
                     + " ordem(ns) cancelada(s); avalie o sinal conforme a política do ateliê." : "");
-        return new CalculoSugestaoPreco(base, ajustePid, precoAjustado, descontoAplicado.setScale(4, RoundingMode.HALF_UP),
+        return new Calculo(base, ajustePid, precoAjustado, descontoAplicado.setScale(4, RoundingMode.HALF_UP),
                 aposFidelidade, piso, sugerido, ordensConcluidas, ordensCanceladas, elegivel, justificativa);
     }
 

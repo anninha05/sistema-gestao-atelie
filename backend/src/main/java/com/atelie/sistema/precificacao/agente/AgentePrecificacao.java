@@ -1,7 +1,6 @@
 package com.atelie.sistema.precificacao.agente;
 
 import com.atelie.sistema.precificacao.ControladorPID;
-import com.atelie.sistema.precificacao.ResultadoPID;
 import java.math.BigDecimal;
 
 public class AgentePrecificacao {
@@ -26,10 +25,10 @@ public class AgentePrecificacao {
         this.erroAnterior = erroAnterior;
     }
 
-    public ResultadoPID agir(Percepcao percepcao) {
+    public ControladorPID.Resultado agir(Percepcao percepcao) {
         double erro = controlador.normalizarErro(percepcao.meta(), percepcao.realizado(), percepcao.dia(),
                 percepcao.diasNoMes());
-        ResultadoPID resultado = controlador.calcular(erro, percepcao.deltaDias(), erroAnterior, integral, ganhos);
+        ControladorPID.Resultado resultado = controlador.calcular(erro, percepcao.deltaDias(), erroAnterior, integral, ganhos);
         integral = resultado.integralAcumulada();
         erroAnterior = erro;
         return resultado;

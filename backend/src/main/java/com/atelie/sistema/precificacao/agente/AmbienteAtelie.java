@@ -1,7 +1,6 @@
 package com.atelie.sistema.precificacao.agente;
 
 import com.atelie.sistema.precificacao.ControladorPID;
-import com.atelie.sistema.precificacao.ResultadoPID;
 import java.math.BigDecimal;
 import java.util.SplittableRandom;
 
@@ -108,7 +107,7 @@ public class AmbienteAtelie {
             realizado[dia - 1] = acumulado;
             ajustes[dia - 1] = ajuste;
 
-            ResultadoPID resultado = agente.agir(new AgentePrecificacao.Percepcao(BigDecimal.valueOf(meta),
+            ControladorPID.Resultado resultado = agente.agir(new AgentePrecificacao.Percepcao(BigDecimal.valueOf(meta),
                     BigDecimal.valueOf(acumulado), dia, dias, 1));
             somaErros += Math.abs(resultado.erroNormalizado());
             somaVariacoes += Math.abs(resultado.ajusteLimitado() - ajuste);

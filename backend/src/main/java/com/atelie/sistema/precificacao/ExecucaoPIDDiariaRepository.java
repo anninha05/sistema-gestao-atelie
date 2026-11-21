@@ -8,4 +8,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ExecucaoPIDDiariaRepository extends JpaRepository<ExecucaoPIDDiaria, Long> {
     Optional<ExecucaoPIDDiaria> findByCompetenciaAndDataApuracao(LocalDate competencia, LocalDate dataApuracao);
     List<ExecucaoPIDDiaria> findByCompetenciaOrderByDataApuracaoDesc(LocalDate competencia);
+    Optional<ExecucaoPIDDiaria> findFirstByCompetenciaOrderByDataApuracaoDesc(LocalDate competencia);
 }

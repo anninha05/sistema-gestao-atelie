@@ -84,11 +84,11 @@ public class ExecucaoPIDDiaria {
     protected ExecucaoPIDDiaria() {}
 
     public ExecucaoPIDDiaria(YearMonth mes, LocalDate dataApuracao, long deltaDias, BigDecimal valorMeta,
-            BigDecimal resultadoRealizado, BigDecimal referenciaAcumulada, ResultadoPID resultado,
-            PoliticaPrecificacao politica, Usuario responsavel) {
+            BigDecimal resultadoRealizado, BigDecimal referenciaAcumulada, ControladorPID.Resultado resultado,
+            ControladorPID.Ganhos ganhos, Usuario responsavel) {
         if (mes == null || dataApuracao == null || !mes.equals(YearMonth.from(dataApuracao)) || deltaDias < 1
                 || valorMeta == null || resultadoRealizado == null || referenciaAcumulada == null
-                || resultado == null || politica == null || responsavel == null)
+                || resultado == null || ganhos == null || responsavel == null)
             throw new IllegalArgumentException("Informe dados completos e coerentes para auditar a execução PID.");
         this.competencia = mes.atDay(1);
         this.dataApuracao = dataApuracao;
@@ -103,11 +103,11 @@ public class ExecucaoPIDDiaria {
         this.saidaBruta = resultado.saidaBruta();
         this.ajusteLimitado = resultado.ajusteLimitado();
         this.integralAcumulada = resultado.integralAcumulada();
-        this.ganhoProporcional = politica.getGanhoProporcional();
-        this.ganhoIntegral = politica.getGanhoIntegral();
-        this.ganhoDerivativo = politica.getGanhoDerivativo();
-        this.ajusteMinimo = politica.getAjusteMinimo();
-        this.ajusteMaximo = politica.getAjusteMaximo();
+        this.ganhoProporcional = ganhos.kp();
+        this.ganhoIntegral = ganhos.ki();
+        this.ganhoDerivativo = ganhos.kd();
+        this.ajusteMinimo = ganhos.ajusteMinimo();
+        this.ajusteMaximo = ganhos.ajusteMaximo();
         this.responsavel = responsavel;
     }
 
@@ -130,6 +130,5 @@ public class ExecucaoPIDDiaria {
     public double getGanhoDerivativo() { return ganhoDerivativo; }
     public double getAjusteMinimo() { return ajusteMinimo; }
     public double getAjusteMaximo() { return ajusteMaximo; }
-    public Long getResponsavelId() { return responsavel.getId(); }
     public String getResponsavelNome() { return responsavel.getNome(); }
 }

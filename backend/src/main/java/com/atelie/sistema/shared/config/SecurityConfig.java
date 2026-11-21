@@ -45,7 +45,6 @@ public class SecurityConfig {
                                                 .requestMatchers("/auth/csrf", "/auth/login").permitAll()
                                                 .requestMatchers("/usuarios/**", "/financeiro/**", "/precificacao/**")
                                                 .hasRole("ADMIN")
-                                                .requestMatchers(HttpMethod.POST, "/ordens-servico/*/aprovar-preco").hasRole("ADMIN")
                                                 .requestMatchers(HttpMethod.GET, "/dashboard/**")
                                                 .hasAnyRole("ADMIN", "ATENDENTE")
                                                 .requestMatchers(HttpMethod.GET, "/ordens-servico/producao",

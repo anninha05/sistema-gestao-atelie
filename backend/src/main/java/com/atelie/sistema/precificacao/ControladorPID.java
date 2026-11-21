@@ -20,6 +20,10 @@ public class ControladorPID {
         }
     }
 
+    public record Resultado(double erroNormalizado, double termoProporcional, double termoIntegral,
+            double termoDerivativo, double saidaBruta, double ajusteLimitado, double integralAcumulada) {
+    }
+
     public double normalizarErro(BigDecimal metaMensal, BigDecimal resultadoRealizado,
             int diaAtual, int diasNoMes) {
         if (metaMensal == null || resultadoRealizado == null || metaMensal.signum() <= 0)
@@ -36,7 +40,7 @@ public class ControladorPID {
         return erro;
     }
 
-    public ResultadoPID calcular(double erroNormalizado, double deltaDias, Double erroAnterior,
+    public Resultado calcular(double erroNormalizado, double deltaDias, Double erroAnterior,
             double integralAnterior, Ganhos ganhos) {
         if (ganhos == null) throw new RegraNegocioException("Informe os ganhos do PID antes do cálculo.");
         if (!Double.isFinite(erroNormalizado) || !Double.isFinite(deltaDias)
@@ -70,7 +74,7 @@ public class ControladorPID {
 
         double termoIntegral = ganhos.ki() * integral;
         validarFinito(termoIntegral);
-        return new ResultadoPID(erroNormalizado, proporcional, termoIntegral, derivativo,
+        return new Resultado(erroNormalizado, proporcional, termoIntegral, derivativo,
                 saidaBruta, limitada, integral);
     }
 

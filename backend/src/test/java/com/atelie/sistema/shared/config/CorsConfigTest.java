@@ -10,7 +10,7 @@ class CorsConfigTest {
     @Test
     void navegadorPodeEnviarPutDaMetaEDoPrecoMinimoComCsrf() throws Exception {
         for (String caminho : java.util.List.of("/precificacao/metas/2026-11",
-                "/precificacao/ordens/00000000-0000-0000-0000-000000000001/preco-minimo")) {
+                "/precificacao/politica")) {
             var request = preflight(caminho, "http://localhost:5173");
             var response = new MockHttpServletResponse();
             var source = new CorsConfig().corsConfigurationSource("http://localhost:5173");
