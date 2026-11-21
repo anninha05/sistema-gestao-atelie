@@ -21,7 +21,7 @@ class DashboardCompromissosTest {
         var inicio = dia.atTime(9, 0);
         var cliente = new Cliente("Ana", "22999999999", "ana@email.com", "52998224725");
         var prova = new OrdemServico(cliente, TipoFluxo.SOB_MEDIDA, new BigDecimal("300"), inicio.plusDays(5));
-        prova.setEstado(new com.atelie.sistema.ordemservico.state.EtapaProducao(StatusOrdemServico.CONFECCAO));
+        prova.iniciarConfeccao();
         // A data de prova é modelada na OS; para teste puro, o agendamento usa a API de reagendamento.
         prova.reagendar(null, null, inicio.plusHours(2), null, inicio.plusDays(5));
 

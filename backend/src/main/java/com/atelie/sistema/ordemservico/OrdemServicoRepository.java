@@ -1,35 +1,36 @@
 package com.atelie.sistema.ordemservico;
 
-import com.atelie.sistema.ordemservico.state.StatusOrdemServico;
-import org.springframework.data.jpa.repository.JpaRepository;
+import jakarta.persistence.LockModeType;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
 
 public interface OrdemServicoRepository extends JpaRepository<OrdemServico, UUID> {
 
-    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
-    @org.springframework.data.jpa.repository.Query("select os from OrdemServico os where os.id = :id")
-    java.util.Optional<OrdemServico> buscarParaAtualizacao(UUID id);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select os from OrdemServico os where os.id = :id")
+    Optional<OrdemServico> buscarParaAtualizacao(UUID id);
 
-    @org.springframework.data.jpa.repository.Query("""
+    @Query("""
             select count(i) from OrdemServico os join os.itens i
             where i.pecaId = :peca and os.inicioLocacao < :fim and os.fimLocacao > :inicio
               and os.statusAtual not in (com.atelie.sistema.ordemservico.state.StatusOrdemServico.DEVOLVIDA,
                                          com.atelie.sistema.ordemservico.state.StatusOrdemServico.CANCELADA)
             """)
-    long contarReservas(UUID peca, java.time.LocalDateTime inicio, java.time.LocalDateTime fim);
+    long contarReservas(UUID peca, LocalDateTime inicio, LocalDateTime fim);
 
-    @org.springframework.data.jpa.repository.Query("""
+    @Query("""
             select count(i) from OrdemServico os join os.itens i
             where i.pecaId = :peca and os.id <> :ordemId
               and os.inicioLocacao < :fim and os.fimLocacao > :inicio
               and os.statusAtual not in (com.atelie.sistema.ordemservico.state.StatusOrdemServico.DEVOLVIDA,
                                          com.atelie.sistema.ordemservico.state.StatusOrdemServico.CANCELADA)
             """)
-    long contarReservasDeOutrasOrdens(UUID peca, java.time.LocalDateTime inicio,
-            java.time.LocalDateTime fim, UUID ordemId);
-
-    List<OrdemServico> findByStatusAtual(StatusOrdemServico statusAtual);
+    long contarReservasDeOutrasOrdens(UUID peca, LocalDateTime inicio, LocalDateTime fim, UUID ordemId);
 
     List<OrdemServico> findByClienteId(UUID clienteId);
 }

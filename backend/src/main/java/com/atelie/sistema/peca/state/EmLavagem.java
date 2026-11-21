@@ -6,23 +6,23 @@ import com.atelie.sistema.shared.exception.RegraNegocioException;
 public class EmLavagem implements EstadoPeca {
 
     @Override
-    public void alugar(Peca peca) {
+    public EstadoPeca alugar(Peca peca) {
         throw new RegraNegocioException("A peça está em lavagem e não pode ser alugada.");
     }
 
     @Override
-    public void enviarParaCostura(Peca peca) {
-        peca.setEstado(new EmCostura());
+    public EstadoPeca enviarParaCostura(Peca peca) {
+        return new EmCostura();
     }
 
     @Override
-    public void enviarParaLavagem(Peca peca) {
+    public EstadoPeca enviarParaLavagem(Peca peca) {
         throw new RegraNegocioException("A peça já está em lavagem.");
     }
 
     @Override
-    public void devolverParaEstoque(Peca peca) {
-        peca.setEstado(new Disponivel());
+    public EstadoPeca devolverParaEstoque(Peca peca) {
+        return new Disponivel();
     }
 
     @Override

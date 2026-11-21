@@ -1,37 +1,29 @@
 package com.atelie.sistema.ordemservico.state;
 
 import com.atelie.sistema.ordemservico.OrdemServico;
+import com.atelie.sistema.peca.TipoFluxo;
 import com.atelie.sistema.shared.exception.RegraNegocioException;
+import java.util.List;
 
-public class Retirada implements EstadoOS {
-
-    @Override
-    public void iniciarConfeccao(OrdemServico os) {
-        throw new RegraNegocioException("A roupa já foi retirada pelo cliente.");
-    }
-
-    @Override
-    public void enviarParaProva(OrdemServico os) {
-        throw new RegraNegocioException("A roupa já foi retirada pelo cliente.");
-    }
-
-    @Override
-    public void concluir(OrdemServico os) {
-        // Já concluída/retirada
-    }
-
-    @Override
-    public void retirar(OrdemServico os) {
-        throw new RegraNegocioException("A roupa já foi retirada.");
-    }
-
-    @Override
-    public void devolver(OrdemServico os) {
-        os.setEstado(new Devolvida());
-    }
+public class Retirada extends EstadoOS {
 
     @Override
     public StatusOrdemServico getStatus() {
         return StatusOrdemServico.RETIRADA;
+    }
+
+    @Override
+    protected List<AcaoDisponivel> acoesDaEtapa(OrdemServico os) {
+        return os.getTipoFluxo() == TipoFluxo.LOCACAO
+                ? List.of(AcaoDisponivel.permitida(AcaoOrdemServico.DEVOLVER))
+                : List.of();
+    }
+
+    @Override
+    public EstadoOS devolver(OrdemServico os) {
+        if (os.getTipoFluxo() != TipoFluxo.LOCACAO) {
+            throw new RegraNegocioException("Somente ordens de locação podem ser devolvidas.");
+        }
+        return new Devolvida();
     }
 }

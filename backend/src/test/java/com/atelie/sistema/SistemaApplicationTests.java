@@ -414,7 +414,7 @@ class SistemaApplicationTests {
         assertEquals(StatusOrdemServico.DEVOLVIDA, ordens.devolver(ordem.id()).statusAtual());
         conferirEstados(ordem, StatusOrdemServico.DEVOLVIDA, StatusDisponibilidade.EM_LAVAGEM);
         for (var item : ordem.itens()) {
-            assertTrue(pecas.listarDisponiveis().stream().noneMatch(peca -> peca.id().equals(item.pecaId())));
+            assertNotEquals(StatusDisponibilidade.DISPONIVEL, pecas.buscarPorId(item.pecaId()).status());
         }
         assertThrows(RegraNegocioException.class, () -> ordens.devolver(ordem.id()));
         conferirEstados(ordem, StatusOrdemServico.DEVOLVIDA, StatusDisponibilidade.EM_LAVAGEM);

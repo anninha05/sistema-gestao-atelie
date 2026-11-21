@@ -6,22 +6,22 @@ import com.atelie.sistema.shared.exception.RegraNegocioException;
 public class Disponivel implements EstadoPeca {
 
     @Override
-    public void alugar(Peca peca) {
-        peca.setEstado(new Alugada());
+    public EstadoPeca alugar(Peca peca) {
+        return new Alugada();
     }
 
     @Override
-    public void enviarParaCostura(Peca peca) {
-        peca.setEstado(new EmCostura());
+    public EstadoPeca enviarParaCostura(Peca peca) {
+        return new EmCostura();
     }
 
     @Override
-    public void enviarParaLavagem(Peca peca) {
-        peca.setEstado(new EmLavagem());
+    public EstadoPeca enviarParaLavagem(Peca peca) {
+        return new EmLavagem();
     }
 
     @Override
-    public void devolverParaEstoque(Peca peca) {
+    public EstadoPeca devolverParaEstoque(Peca peca) {
         throw new RegraNegocioException("A peça já está disponível no estoque.");
     }
 

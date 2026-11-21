@@ -4,8 +4,10 @@ import com.atelie.sistema.cliente.dto.ClienteRequestDTO;
 import com.atelie.sistema.cliente.dto.ClienteResponseDTO;
 import com.atelie.sistema.ordemservico.OrdemServicoService;
 import com.atelie.sistema.ordemservico.dto.OrdemServicoResponseDTO;
+import com.atelie.sistema.usuario.Perfil;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -45,7 +47,8 @@ public class ClienteController {
     }
 
     @GetMapping("/{id}/ordens-servico")
-    public ResponseEntity<List<OrdemServicoResponseDTO>> historico(@PathVariable UUID id) {
-        return ResponseEntity.ok(ordemServicoService.listarPorCliente(id));
+    public List<OrdemServicoResponseDTO> historico(@PathVariable UUID id, Authentication usuario) {
+        Perfil perfil = Perfil.de(usuario);
+        return ordemServicoService.listarPorCliente(id).stream().map(ordem -> ordem.paraPerfil(perfil)).toList();
     }
 }

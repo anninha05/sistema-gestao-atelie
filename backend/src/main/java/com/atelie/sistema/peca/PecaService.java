@@ -1,19 +1,21 @@
 package com.atelie.sistema.peca;
 
-import com.atelie.sistema.peca.dto.PecaRequestDTO;
 import com.atelie.sistema.peca.dto.LiberacaoPecaRequestDTO;
-import com.atelie.sistema.peca.dto.PecaResponseDTO;
 import com.atelie.sistema.peca.dto.PecaProducaoResponse;
-import com.atelie.sistema.peca.state.StatusDisponibilidade;
+import com.atelie.sistema.peca.dto.PecaRequestDTO;
+import com.atelie.sistema.peca.dto.PecaResponseDTO;
 import com.atelie.sistema.shared.exception.RecursoNaoEncontradoException;
+import com.atelie.sistema.shared.exception.RegraNegocioException;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.UUID;
-
 @Service
 public class PecaService {
+
+    private static final BigDecimal VALOR_MAXIMO = new BigDecimal("99999999.99");
 
     private final PecaRepository pecaRepository;
 
@@ -23,55 +25,28 @@ public class PecaService {
 
     @Transactional
     public PecaResponseDTO cadastrarPeca(PecaRequestDTO dto) {
-        if (dto.tipo() == null || dto.descricao() == null || dto.descricao().isBlank()
-                || dto.descricao().length() > 255
-                || (dto.tamanho() != null && dto.tamanho().length() > 10)
-                || (dto.cor() != null && dto.cor().length() > 50)
-                || (dto.valorBase() != null && (dto.valorBase().signum() < 0
-                    || dto.valorBase().stripTrailingZeros().scale() > 2
-                    || dto.valorBase().compareTo(new java.math.BigDecimal("99999999.99")) > 0))) {
-            throw new com.atelie.sistema.shared.exception.RegraNegocioException("Dados da peça inválidos.");
-        }
-        Peca novaPeca = new Peca(dto.descricao(), dto.tipo());
-        if (dto.valorBase() != null) {
-            novaPeca.setValorBase(dto.valorBase());
-        }
-        if (dto.tamanho() != null) {
-            novaPeca.setTamanho(dto.tamanho());
-        }
-        if (dto.cor() != null) {
-            novaPeca.setCor(dto.cor());
-        }
-        Peca pecaSalva = pecaRepository.save(novaPeca);
-
-        return toResponseDTO(pecaSalva);
+        validarDados(dto, true);
+        Peca novaPeca = new Peca(dto.descricao().strip(), dto.tipo(), dto.valorBase(),
+                normalizarOpcional(dto.tamanho()), normalizarOpcional(dto.cor()));
+        return toResponseDTO(pecaRepository.save(novaPeca));
     }
 
-    public List<PecaResponseDTO> listarDisponiveis() {
-        return pecaRepository.findByStatusDisponibilidade(StatusDisponibilidade.DISPONIVEL).stream()
-                .map(this::toResponseDTO)
-                .toList();
-    }
-
+    @Transactional(readOnly = true)
     public List<PecaResponseDTO> listarTodas() {
-        return pecaRepository.findAll().stream()
-                .map(this::toResponseDTO)
-                .toList();
+        return pecaRepository.findAll().stream().map(this::toResponseDTO).toList();
     }
 
+    @Transactional(readOnly = true)
     public List<PecaProducaoResponse> listarParaProducao() {
-        return pecaRepository.findAll().stream()
-                .map(p -> new PecaProducaoResponse(p.getId(), p.getDescricao(), p.getCodigoEtiqueta(),
-                        p.getTamanho(), p.getCor(), p.getStatusDisponibilidade()))
-                .toList();
+        return pecaRepository.findAll().stream().map(this::toProducaoResponse).toList();
     }
 
+    @Transactional(readOnly = true)
     public PecaProducaoResponse buscarParaProducao(UUID id) {
-        Peca peca = buscarEntidadePorId(id);
-        return new PecaProducaoResponse(peca.getId(), peca.getDescricao(), peca.getCodigoEtiqueta(),
-                peca.getTamanho(), peca.getCor(), peca.getStatusDisponibilidade());
+        return toProducaoResponse(buscarEntidadePorId(id));
     }
 
+    @Transactional(readOnly = true)
     public PecaResponseDTO buscarPorId(UUID id) {
         return toResponseDTO(buscarEntidadePorId(id));
     }
@@ -85,43 +60,18 @@ public class PecaService {
         return toResponseDTO(peca);
     }
 
-    private void validarDados(PecaRequestDTO dto, boolean exigirTipo) {
-        if (dto == null || (exigirTipo && dto.tipo() == null) || dto.descricao() == null || dto.descricao().isBlank()
-                || dto.descricao().length() > 255
-                || (dto.tamanho() != null && dto.tamanho().length() > 10)
-                || (dto.cor() != null && dto.cor().length() > 50)
-                || dto.valorBase() == null || dto.valorBase().signum() < 0
-                || dto.valorBase().stripTrailingZeros().scale() > 2
-                || dto.valorBase().compareTo(new java.math.BigDecimal("99999999.99")) > 0) {
-            throw new com.atelie.sistema.shared.exception.RegraNegocioException("Dados da peça inválidos.");
-        }
-    }
-
-    private String normalizarOpcional(String valor) {
-        return valor == null || valor.isBlank() ? null : valor.strip();
-    }
-
-    public Peca buscarEntidadePorId(UUID id) {
-        return pecaRepository.findById(id)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Peça não encontrada com id: " + id));
-    }
-
     @Transactional
     public PecaResponseDTO enviarParaCostura(UUID id) {
         Peca peca = buscarParaAtualizacao(id);
         peca.enviarParaCostura();
-        return toResponseDTO(pecaRepository.save(peca));
+        return toResponseDTO(peca);
     }
 
     @Transactional
     public PecaResponseDTO enviarParaLavagem(UUID id) {
         Peca peca = buscarParaAtualizacao(id);
-        if (peca.getStatusDisponibilidade() == StatusDisponibilidade.ALUGADA) {
-            throw new com.atelie.sistema.shared.exception.RegraNegocioException(
-                    "Registre a devolução na ordem de serviço para encaminhar a peça à lavagem.");
-        }
         peca.enviarParaLavagem();
-        return toResponseDTO(pecaRepository.save(peca));
+        return toResponseDTO(peca);
     }
 
     @Transactional
@@ -129,7 +79,29 @@ public class PecaService {
         Peca peca = buscarParaAtualizacao(id);
         peca.devolverParaEstoque(confirmacao != null && Boolean.TRUE.equals(confirmacao.lavagemConcluida()),
                 confirmacao != null && Boolean.TRUE.equals(confirmacao.condicoesConferidas()));
-        return toResponseDTO(pecaRepository.save(peca));
+        return toResponseDTO(peca);
+    }
+
+    public Peca buscarEntidadePorId(UUID id) {
+        return pecaRepository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Peça não encontrada com id: " + id));
+    }
+
+    private void validarDados(PecaRequestDTO dto, boolean cadastro) {
+        BigDecimal valor = dto == null ? null : dto.valorBase();
+        boolean valorInvalido = valor == null ? !cadastro
+                : valor.signum() < 0 || valor.stripTrailingZeros().scale() > 2 || valor.compareTo(VALOR_MAXIMO) > 0;
+        if (dto == null || (cadastro && dto.tipo() == null) || dto.descricao() == null || dto.descricao().isBlank()
+                || dto.descricao().length() > 255
+                || (dto.tamanho() != null && dto.tamanho().length() > 10)
+                || (dto.cor() != null && dto.cor().length() > 50)
+                || valorInvalido) {
+            throw new RegraNegocioException("Dados da peça inválidos.");
+        }
+    }
+
+    private String normalizarOpcional(String valor) {
+        return valor == null || valor.isBlank() ? null : valor.strip();
     }
 
     private Peca buscarParaAtualizacao(UUID id) {
@@ -140,5 +112,10 @@ public class PecaService {
     private PecaResponseDTO toResponseDTO(Peca p) {
         return new PecaResponseDTO(p.getId(), p.getDescricao(), p.getTipo(), p.getStatusDisponibilidade(),
                 p.getCodigoEtiqueta(), p.getTamanho(), p.getCor(), p.getValorBase());
+    }
+
+    private PecaProducaoResponse toProducaoResponse(Peca p) {
+        return new PecaProducaoResponse(p.getId(), p.getDescricao(), p.getCodigoEtiqueta(),
+                p.getTamanho(), p.getCor(), p.getStatusDisponibilidade());
     }
 }

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
+import com.atelie.sistema.usuario.Perfil;
 import org.springframework.security.core.Authentication;
 
 @RestController
@@ -35,11 +36,6 @@ public class PecaController {
     @GetMapping("/producao")
     public ResponseEntity<List<PecaProducaoResponse>> listarParaProducao() {
         return ResponseEntity.ok(pecaService.listarParaProducao());
-    }
-
-    @GetMapping("/disponiveis")
-    public ResponseEntity<List<PecaResponseDTO>> listarDisponiveis() {
-        return ResponseEntity.ok(pecaService.listarDisponiveis());
     }
 
     @GetMapping("/{id}")
@@ -72,7 +68,7 @@ public class PecaController {
     }
 
     private Object respostaAtualizada(UUID id, Authentication usuario) {
-        boolean producao = usuario.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_PRODUCAO"));
-        return producao ? pecaService.buscarParaProducao(id) : pecaService.buscarPorId(id);
+        return Perfil.de(usuario) == Perfil.ROLE_PRODUCAO
+                ? pecaService.buscarParaProducao(id) : pecaService.buscarPorId(id);
     }
 }

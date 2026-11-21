@@ -1,12 +1,16 @@
 package com.atelie.sistema.ordemservico;
 
 import com.atelie.sistema.cliente.Cliente;
-import com.atelie.sistema.ordemservico.state.*;
+import com.atelie.sistema.ordemservico.state.AcaoDisponivel;
+import com.atelie.sistema.ordemservico.state.EstadoOS;
+import com.atelie.sistema.ordemservico.state.Reservada;
+import com.atelie.sistema.ordemservico.state.StatusOrdemServico;
 import com.atelie.sistema.peca.TipoFluxo;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -44,7 +48,7 @@ public class OrdemServico {
 
     @ElementCollection
     @CollectionTable(name = "ordens_servico_pecas", joinColumns = @JoinColumn(name = "ordem_servico_id"))
-    private List<ItemOrdemServico> itens = new java.util.ArrayList<>();
+    private List<ItemOrdemServico> itens = new ArrayList<>();
 
     private BigDecimal desconto = BigDecimal.ZERO;
     private LocalDateTime inicioLocacao;
@@ -74,7 +78,7 @@ public class OrdemServico {
         this.tipoFluxo = tipoFluxo;
         this.valorTotal = valorTotal;
         this.dataEntrega = dataEntrega;
-        this.setEstado(new Reservada());
+        aplicar(new Reservada());
         if (valorTotal != null) {
             this.pagamento = new Pagamento(this, valorTotal);
         }
@@ -134,96 +138,69 @@ public class OrdemServico {
     // STATE PATTERN
 
     public EstadoOS getEstado() {
-        if (this.estado == null) {
-            this.estado = mapearEstado(this.statusAtual);
+        if (estado == null) {
+            estado = EstadoOS.de(statusAtual);
         }
-        return this.estado;
+        return estado;
     }
 
-    public void setEstado(EstadoOS estado) {
-        this.estado = estado;
-        this.statusAtual = estado.getStatus();
-    }
-
-    private EstadoOS mapearEstado(StatusOrdemServico status) {
-        if (status == null) {
-            return new Reservada();
-        }
-        return switch (status) {
-            case EM_PROVA, PROVA -> new EmProva();
-            case RETIRADA -> new Retirada();
-            case CONFECCAO, AJUSTES, PASSADORIA, CONCLUIDO, ENTREGUE, CANCELADA -> new EtapaProducao(status);
-            case DEVOLVIDA -> new Devolvida();
-            default -> new Reservada();
-        };
+    private void aplicar(EstadoOS novoEstado) {
+        this.estado = novoEstado;
+        this.statusAtual = novoEstado.getStatus();
     }
 
     @PostLoad
     protected void onPostLoad() {
-        this.estado = mapearEstado(this.statusAtual);
+        this.estado = EstadoOS.de(this.statusAtual);
+    }
+
+    public List<AcaoDisponivel> acoesDisponiveis() {
+        return getEstado().acoesDisponiveis(this);
+    }
+
+    public boolean estaEmProducao() {
+        return getEstado().estaEmProducao();
+    }
+
+    public boolean estaQuitada() {
+        return getPagamento().getSaldoDevedor().signum() == 0;
     }
 
     public void iniciarConfeccao() {
-        getEstado().iniciarConfeccao(this);
-    }
-
-    public void iniciarPassadoria() {
-        if (statusAtual != StatusOrdemServico.AJUSTES && statusAtual != StatusOrdemServico.EM_PROVA) {
-            throw new com.atelie.sistema.shared.exception.RegraNegocioException(
-                    "A ordem precisa passar pelos ajustes.");
-        }
-        setEstado(new EtapaProducao(StatusOrdemServico.PASSADORIA));
-    }
-
-    public void cancelar() {
-        switch (statusAtual) {
-            case RETIRADA, ENTREGUE, DEVOLVIDA, CANCELADA ->
-                throw new com.atelie.sistema.shared.exception.RegraNegocioException(
-                        "A ordem não pode mais ser cancelada.");
-            default -> {
-                pendenciaAcerto = getPagamento().getValorPago().signum() > 0;
-                setEstado(new EtapaProducao(StatusOrdemServico.CANCELADA));
-            }
-        }
+        aplicar(getEstado().iniciarConfeccao(this));
     }
 
     public void enviarParaProva() {
-        getEstado().enviarParaProva(this);
+        aplicar(getEstado().enviarParaProva(this));
+    }
+
+    public void iniciarPassadoria() {
+        aplicar(getEstado().iniciarPassadoria(this));
     }
 
     public void concluir() {
-        getEstado().concluir(this);
-    }
-
-    public void entregarAoCliente() {
-        retirar();
+        aplicar(getEstado().concluir(this));
     }
 
     public void retirar() {
-        if (getPagamento().getSaldoDevedor().compareTo(BigDecimal.ZERO) != 0) {
-            throw new com.atelie.sistema.shared.exception.RegraNegocioException(
-                    "Quite o saldo devedor da ordem antes de registrar a retirada ou entrega.");
-        }
-        getEstado().retirar(this);
+        aplicar(getEstado().retirar(this));
     }
 
     public void devolver() {
-        if (tipoFluxo != TipoFluxo.LOCACAO) {
-            throw new com.atelie.sistema.shared.exception.RegraNegocioException(
-                    "Somente ordens de locação podem ser devolvidas.");
-        }
-        getEstado().devolver(this);
+        aplicar(getEstado().devolver(this));
+    }
+
+    public void cancelar() {
+        aplicar(getEstado().cancelar(this));
+        pendenciaAcerto = getPagamento().getValorPago().signum() > 0;
     }
 
     public void reagendar(LocalDateTime inicioLocacao, LocalDateTime fimLocacao,
             LocalDateTime dataProva, LocalDateTime dataEvento, LocalDateTime dataEntrega) {
-        if (statusAtual == StatusOrdemServico.RETIRADA || statusAtual == StatusOrdemServico.ENTREGUE
-                || statusAtual == StatusOrdemServico.DEVOLVIDA || statusAtual == StatusOrdemServico.CANCELADA) {
-            throw new com.atelie.sistema.shared.exception.RegraNegocioException(
-                    "Não é possível reagendar uma ordem já retirada, entregue, devolvida ou cancelada.");
-        }
-        this.inicioLocacao = tipoFluxo == TipoFluxo.LOCACAO ? inicioLocacao : null;
-        this.fimLocacao = tipoFluxo == TipoFluxo.LOCACAO ? fimLocacao : null;
+        getEstado().validarReagendamento();
+        boolean locacao = tipoFluxo == TipoFluxo.LOCACAO;
+        this.inicioLocacao = locacao ? inicioLocacao : null;
+        this.fimLocacao = locacao ? fimLocacao : null;
         this.dataProva = dataProva;
         this.dataEvento = dataEvento;
         this.dataEntrega = dataEntrega;
@@ -231,25 +208,15 @@ public class OrdemServico {
 
     // PAGAMENTO (COMPOSIÇÃO)
 
-    public void registrarSinal(BigDecimal valor, LocalDate data) {
-        garantirPagamento().registrarSinal(valor, data);
-    }
-
-    public void registrarPagamento(BigDecimal valor) {
-        garantirPagamento().registrarPagamento(valor);
+    public void registrarRecebimento(BigDecimal valor, LocalDate data, MetodoPagamento metodo, boolean sinal) {
+        getEstado().validarRecebimento();
+        getPagamento().registrarRecebimento(valor, data, metodo, sinal);
     }
 
     public void alterarValorTotal(BigDecimal novoValor) {
-        Pagamento pag = garantirPagamento();
+        Pagamento pag = getPagamento();
         pag.alterarValorTotal(novoValor);
         this.valorTotal = pag.getValorTotal();
-    }
-
-    private Pagamento garantirPagamento() {
-        if (this.pagamento == null) {
-            this.pagamento = new Pagamento(this, this.valorTotal);
-        }
-        return this.pagamento;
     }
 
     // AUDITORIA
@@ -257,18 +224,12 @@ public class OrdemServico {
     @PrePersist
     protected void onCreate() {
         this.criadoEm = LocalDateTime.now();
-        this.atualizadoEm = LocalDateTime.now();
-        if (this.statusAtual == null && this.estado != null) {
-            this.statusAtual = this.estado.getStatus();
-        }
+        this.atualizadoEm = this.criadoEm;
     }
 
     @PreUpdate
     protected void onUpdate() {
         this.atualizadoEm = LocalDateTime.now();
-        if (this.estado != null) {
-            this.statusAtual = this.estado.getStatus();
-        }
     }
 
     public UUID getId() {
@@ -292,12 +253,17 @@ public class OrdemServico {
     }
 
     public Pagamento getPagamento() {
-        return garantirPagamento();
+        if (pagamento == null) {
+            pagamento = new Pagamento(this, valorTotal);
+        }
+        return pagamento;
     }
 
     public LocalDateTime getDataEntrega() {
         return dataEntrega;
     }
 
-    public boolean isPendenciaAcerto() { return pendenciaAcerto; }
+    public boolean isPendenciaAcerto() {
+        return pendenciaAcerto;
+    }
 }
