@@ -1,5 +1,4 @@
-import '@fontsource-variable/lexend';
-import '@fontsource-variable/fraunces';
+import '@fontsource-variable/inter';
 import { BrowserRouter } from 'react-router-dom';
 import { ProvedorDeAutenticacao } from '../features/auth/AuthContext.jsx';
 import AppRoutes from './AppRoutes.jsx';
