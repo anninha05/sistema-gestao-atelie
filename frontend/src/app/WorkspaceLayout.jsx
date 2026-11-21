@@ -42,7 +42,7 @@ export default function LayoutDoAtelie({ perfil, paginas, children }) {
       <header className="workspace-sidebar">
         <div className="workspace-brand">
           <Marca />
-          <button type="button" className="workspace-perfil-chip" aria-haspopup="dialog" onClick={abrirPerfil}>
+          <button type="button" className="workspace-perfil-chip botao-secundario" aria-haspopup="dialog" onClick={abrirPerfil}>
             {perfil}
           </button>
         </div>

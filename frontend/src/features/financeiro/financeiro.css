@@ -2,7 +2,7 @@
 .financeiro-resumo-observacao { margin: -.75rem 0 0; color: var(--muted); font-size: .8rem; }
 
 .pid-modulo { display: grid; gap: 1rem; margin-top: 2.5rem; }
-.pid-cabecalho h2 { margin: 0 0 .25rem; font-size: 1.3rem; }
+.pid-cabecalho h2 { margin: 0 0 .25rem; font: 400 clamp(1.6rem, 3vw, 2rem)/1.1 var(--serif); }
 .pid-cabecalho .eyebrow { color: var(--accent-texto); }
 .pid-cabecalho p, .pid-cartao > p, .pid-subcabecalho p { margin: .35rem 0 0; color: var(--muted); font-size: .9rem; line-height: 1.5; }
 .pid-cartoes-configuracao { display: grid; gap: 1rem; align-items: stretch; }
@@ -67,7 +67,7 @@ fieldset.pid-form-simulacao { display: grid; grid-template-columns: minmax(0, 1f
 .pid-resultado-topo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
 .pid-resultado-topo > div { display: grid; gap: .2rem; }
 .pid-resultado-topo span { color: var(--muted); font-size: .8rem; }
-.pid-resultado-topo strong { color: var(--accent-texto); font-size: 1.85rem; font-weight: 650; letter-spacing: -.02em; }
+.pid-resultado-topo strong { color: var(--accent); font: 400 2rem/1.1 var(--serif); }
 .pid-resultado > p { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
 .pid-resultado summary { cursor: pointer; color: var(--accent-texto); font-size: .9rem; font-weight: 600; }
 .pid-resultado .modal-acoes { margin-top: .5rem; }
