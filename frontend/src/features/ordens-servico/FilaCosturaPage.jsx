@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, requisitarComCsrf } from '../../shared/api.js';
-import { Aviso } from '../../shared/Interface.jsx';
+import { Aviso, CabecalhoPagina, Etiqueta, Icone } from '../../shared/Interface.jsx';
+import { dataHora, tiposFluxo } from '../../shared/formatos.js';
 import { acoesDiretas, rotasDasAcoes } from './acoes.js';
 import '../../shared/styles/catalogo.css';
 
@@ -11,7 +12,6 @@ const etapas = [
   { rotulo: 'Ajustes', estados: ['AJUSTES'] },
   { rotulo: 'Passadoria', estados: ['PASSADORIA'] },
 ];
-const dataHora = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
 export default function FilaCosturaPage({ titulo }) {
   const [fila, setFila] = useState(null);
@@ -19,6 +19,7 @@ export default function FilaCosturaPage({ titulo }) {
   const [tentativa, setTentativa] = useState(0);
   const [atualizando, setAtualizando] = useState(null);
   const [mensagem, setMensagem] = useState(null);
+  const [etapaAtiva, setEtapaAtiva] = useState(null);
 
   useEffect(() => {
     const controlador = new AbortController();
@@ -54,12 +55,14 @@ export default function FilaCosturaPage({ titulo }) {
   const secoes = etapas.map((etapa) => ({
     ...etapa,
     ordens: fila?.ordens.filter((ordem) => etapa.estados.includes(ordem.statusAtual)) ?? [],
-  })).filter((etapa) => etapa.ordens.length > 0);
+  }));
+  const secaoAtual = secoes.find((etapa) => etapa.rotulo === etapaAtiva && etapa.ordens.length)
+    ?? secoes.find((etapa) => etapa.ordens.length);
 
   return (
     <section className="catalogo" aria-labelledby="fila-title">
-      <h1 id="fila-title">{titulo}</h1>
-      <p className="intro">Consulte as peças e avance a produção de cada ordem.</p>
+      <CabecalhoPagina id="fila-title" titulo={titulo}
+        descricao={fila ? fila.ordens.length + (fila.ordens.length === 1 ? ' ordem na bancada' : ' ordens na bancada') : 'Consulte as peças e avance a produção de cada ordem.'} />
       {!fila && !erroAoCarregar && <p role="status">Carregando fila…</p>}
       {erroAoCarregar && (
         <div>
@@ -71,39 +74,51 @@ export default function FilaCosturaPage({ titulo }) {
         </div>
       )}
       {mensagem && <Aviso tipo={mensagem.erro ? 'erro' : 'sucesso'}>{mensagem.texto}</Aviso>}
-      {fila && secoes.length === 0 && <p>Nenhuma ordem em produção ou aguardando início.</p>}
-      {secoes.map((etapa) => (
-        <section key={etapa.rotulo}>
-          <h2>{etapa.rotulo} ({etapa.ordens.length})</h2>
-          <ul className="catalogo-lista" role="list">
-            {etapa.ordens.map((ordem) => {
-              const prazo = ordem.dataEntrega || ordem.inicioLocacao || ordem.dataEvento;
-              return (
-                <li key={ordem.id} aria-busy={atualizando === ordem.id}>
-                  <h3>{ordem.clienteNome}</h3>
-                  <dl>
-                    <div><dt>Peças</dt><dd>{ordem.pecas?.map((item) =>
-                      fila.nomesDasPecas.get(item.pecaId) ?? item.pecaId).join(', ') || '—'}</dd></div>
-                    <div><dt>Prazo</dt><dd>{prazo ? dataHora.format(new Date(prazo)) : '—'}</dd></div>
-                    <div><dt>Prova</dt><dd>{ordem.dataProva ? dataHora.format(new Date(ordem.dataProva)) : '—'}</dd></div>
-                    {ordem.pecas?.map((item) => <div key={item.pecaId}>
-                      <dt>{fila.nomesDasPecas.get(item.pecaId) ?? 'Peça'} · medidas</dt><dd>{item.medidas || '—'}</dd>
-                      <dt>Instruções de costura</dt><dd>{item.instrucoesCostura || '—'}</dd>
-                    </div>)}
-                  </dl>
-                  <div className="fila-acoes">
-                    {acoesDiretas(ordem).map((item) => (
-                      <button key={item.acao} type="button" disabled={atualizando !== null || !item.habilitada}
-                        title={item.motivoBloqueio ?? undefined}
-                        onClick={() => avancar(ordem, item.acao)}>{item.rotulo}</button>
-                    ))}
+      {fila && !secaoAtual && <p className="catalogo-vazio">Nenhuma ordem em produção ou aguardando início.</p>}
+      {secaoAtual && <>
+        <div className="fila-etapas" role="group" aria-label="Etapas da produção">
+          {secoes.map((etapa) => (
+            <button key={etapa.rotulo} type="button" aria-pressed={etapa === secaoAtual}
+              disabled={!etapa.ordens.length} onClick={() => setEtapaAtiva(etapa.rotulo)}>
+              {etapa.rotulo} <span>{etapa.ordens.length}</span>
+            </button>
+          ))}
+        </div>
+        <h2 className="fila-titulo">{secaoAtual.rotulo}</h2>
+        <ul className="catalogo-lista" role="list">
+          {secaoAtual.ordens.map((ordem) => {
+            const prazo = ordem.dataEntrega || ordem.inicioLocacao || ordem.dataEvento;
+            return (
+              <li key={ordem.id} className="cartao catalogo-item" aria-busy={atualizando === ordem.id}>
+                <div className="catalogo-item-topo">
+                  <div>
+                    <h3>{ordem.clienteNome}</h3>
+                    {prazo && <span className="fila-prazo"><Icone nome="prazo" /> Prazo: {dataHora.format(new Date(prazo))}</span>}
                   </div>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ))}
+                  <Etiqueta tom={ordem.tipoFluxo === 'LOCACAO' ? 'azul' : 'rosa'}>{tiposFluxo[ordem.tipoFluxo] ?? ordem.tipoFluxo}</Etiqueta>
+                </div>
+                {ordem.dataProva && <p className="fila-prova">Prova: {dataHora.format(new Date(ordem.dataProva))}</p>}
+                {ordem.pecas?.map((item) => (
+                  <div className="fila-peca" key={item.pecaId}>
+                    <strong>{fila.nomesDasPecas.get(item.pecaId) ?? 'Peça'}</strong>
+                    <dl>
+                      <div><dt>Medidas</dt><dd>{item.medidas || '—'}</dd></div>
+                      <div><dt>Instruções de costura</dt><dd>{item.instrucoesCostura || '—'}</dd></div>
+                    </dl>
+                  </div>
+                ))}
+                <div className="catalogo-item-acoes">
+                  {acoesDiretas(ordem).map((item) => (
+                    <button key={item.acao} type="button" className={item.acao === 'CANCELAR' ? 'botao-secundario' : 'botao-com-icone'}
+                      disabled={atualizando !== null || !item.habilitada} title={item.motivoBloqueio ?? undefined}
+                      onClick={() => avancar(ordem, item.acao)}>{item.rotulo}</button>
+                  ))}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </>}
     </section>
   );
 }

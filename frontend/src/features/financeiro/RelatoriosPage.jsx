@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import Catalogo from '../../shared/Catalogo.jsx';
-import { Aviso, Modal, Selecao, validarCampos } from '../../shared/Interface.jsx';
+import { Aviso, CabecalhoPagina, Icone, Modal, Selecao, validarCampos } from '../../shared/Interface.jsx';
+import { moeda } from '../../shared/formatos.js';
 import { api, requisitarComCsrf } from '../../shared/api.js';
 import PrecificacaoPID from './PrecificacaoPID.jsx';
 import './financeiro.css';
 
 const caminhoDespesas = '/financeiro/despesas';
-const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const metodos = {
   PIX: 'Pix',
   CARTAO: 'Cartão',
@@ -48,7 +48,7 @@ function BaixaDespesa({ despesa, aoAtualizar }) {
   }
 
   return (
-    <div className="despesa-baixa">
+    <div>
       <button type="button" aria-haspopup="dialog"
         disabled={salvando} onClick={() => {
           setAberta(true);
@@ -98,25 +98,34 @@ export default function RelatoriosPage({ titulo }) {
 
   return (
     <>
-    <section className="financeiro-resumo" aria-label="Consolidado financeiro mensal">
-      <div className="financeiro-resumo-cabecalho"><div><h2>Resumo de caixa</h2>
-        <p>Valores efetivamente recebidos e despesas pagas por data de liquidação.</p></div>
-        <label>Mês<input type="month" value={mes} onChange={(evento) => setMes(evento.target.value)} /></label>
-      </div>
+    <CabecalhoPagina id="financeiro-title" titulo={titulo} descricao="O caixa do seu ateliê, com clareza para cada decisão.">
+      <label className="financeiro-mes"><span className="sr-only">Mês</span>
+        <input type="month" value={mes} onChange={(evento) => setMes(evento.target.value)} />
+      </label>
+    </CabecalhoPagina>
+    <section aria-label="Consolidado financeiro mensal">
       {erroIndicadores && <Aviso>Não foi possível carregar o consolidado financeiro.</Aviso>}
       {!indicadores && !erroIndicadores && <p role="status">Carregando consolidado…</p>}
       {indicadores && <>
-        <dl className="financeiro-resumo-valores">
-          <div><dt>Recebimentos realizados</dt><dd>{moeda.format(indicadores.recebimentosRealizados)}</dd></div>
-          <div><dt>Despesas pagas</dt><dd>{moeda.format(indicadores.despesasPagas)}</dd></div>
-          <div><dt>Resultado de caixa</dt><dd>{moeda.format(indicadores.resultadoDeCaixa)}</dd></div>
-          <div><dt>Saldo total a receber</dt><dd>{moeda.format(indicadores.saldoTotalAReceber)}</dd></div>
+        <dl className="indicadores">
+          {[
+            ['Recebimentos realizados', indicadores.recebimentosRealizados, 'entrada', 'Valores recebidos no mês'],
+            ['Despesas pagas', indicadores.despesasPagas, 'saida', 'Saídas liquidadas no mês'],
+            ['Resultado de caixa', indicadores.resultadoDeCaixa, 'financeiro', 'Recebimentos menos despesas pagas'],
+            ['Saldo a receber', indicadores.saldoTotalAReceber, 'prazo', 'Pendente nas ordens em aberto'],
+          ].map(([rotulo, valor, icone, detalhe]) => (
+            <div className="cartao indicador" key={rotulo}>
+              <dt className="indicador-topo">{rotulo} <Icone nome={icone} /></dt>
+              <dd className="indicador-valor">{moeda.format(valor)}</dd>
+              <dd className="indicador-detalhe">{detalhe}</dd>
+            </div>
+          ))}
         </dl>
         <p className="financeiro-resumo-observacao">{indicadores.observacao}</p>
       </>}
     </section>
     <PrecificacaoPID mes={mes} />
-    <Catalogo titulo={titulo} descricao="Cadastre despesas e acompanhe os pagamentos do ateliê."
+    <Catalogo secao titulo="Despesas" descricao="Cadastre despesas e acompanhe os pagamentos do ateliê."
       caminho={caminhoDespesas} rotuloCadastro="Nova despesa" rotuloBusca="Buscar por descrição ou categoria"
       correspondeABusca={(despesa, busca) => {
         const paga = Boolean(despesa.dataPagamento);
@@ -145,11 +154,11 @@ export default function RelatoriosPage({ titulo }) {
       })}
       aoCadastrar={() => setSituacao('')}
       tituloDoItem={(despesa) => despesa.descricao}
+      subtituloDoItem={(despesa) => despesa.categoria}
+      etiquetaDoItem={(despesa) => despesa.dataPagamento ? ['Paga', 'verde'] : ['Em aberto', 'amarelo']}
       detalhesDoItem={(despesa) => [
-        ['Categoria', despesa.categoria],
         ['Valor', moeda.format(despesa.valor)],
         ['Vencimento', formatarData(despesa.vencimento)],
-        ['Situação', despesa.dataPagamento ? 'Paga' : 'Em aberto'],
         ...(despesa.dataPagamento ? [
           ['Pagamento', formatarData(despesa.dataPagamento)],
           ['Método', metodos[despesa.metodo] ?? despesa.metodo],
