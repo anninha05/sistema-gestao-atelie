@@ -195,3 +195,77 @@ Internet ──► Caddy (80/443, HTTPS automático) ──► Nginx (frontend) 
    ```bash
    git pull && docker compose --profile producao up -d --build
    ```
+## Módulo de IA: Agente Inteligente de Precificação
+
+Este repositório também contém o trabalho da disciplina de **Inteligência Artificial**: um agente com aprendizado que sugere ajustes de preço para o ateliê atingir a meta de faturamento do mês.
+
+### Por que o agente está dentro do sistema?
+
+O agente foi pensado para o ateliê real atendido pelo Linho. Por isso ele fica integrado ao backend:
+
+- lê do banco a **meta do mês**, os **recebimentos** e as **despesas**;
+- registra cada decisão diária;
+- gera uma **sugestão de preço** para ordens reservadas, que **só é aplicada depois da aprovação da administradora**.
+
+O núcleo do agente (controlador PID, simulador e calibração com Twiddle) foi escrito **do zero em Java 21**, sem bibliotecas de IA, e pode ser executado **sem banco de dados e sem o restante do sistema**.
+
+### Onde está o código
+
+```
+backend/src/main/java/com/atelie/sistema/precificacao/
+├── ControladorPID.java           # decisão: PID com saturação e anti-windup
+├── PrecificacaoService.java      # integração com os dados reais do sistema
+├── SugestaoPrecoService.java     # sugestão de preço e aprovação
+└── agente/
+    ├── AgentePrecificacao.java       # percepção e decisão do agente
+    ├── AmbienteAtelie.java           # simulador de um mês do ateliê (Poisson)
+    ├── CalibradorGanhos.java         # aprendizado dos ganhos (Twiddle)
+    └── ExperimentoPrecificacao.java  # treino, teste e geração dos resultados
+```
+
+### Pré-requisitos
+
+- **Java 21**: é o único requisito para rodar os experimentos.
+- **Python 3 com matplotlib**: opcional, só para gerar os gráficos.
+
+### Como rodar os experimentos
+
+Na pasta `backend`:
+
+**Linux / macOS**
+```bash
+./mvnw compile
+java -cp target/classes com.atelie.sistema.precificacao.agente.ExperimentoPrecificacao ../experimentos
+```
+
+**Windows (PowerShell)**
+```powershell
+.\mvnw.cmd compile
+java -cp target\classes com.atelie.sistema.precificacao.agente.ExperimentoPrecificacao ..\experimentos
+```
+
+O programa calibra o agente, compara três abordagens (preço fixo, PID com ganhos manuais e PID calibrado) em cinco cenários de mercado e grava os resultados na pasta `experimentos`:
+
+| Arquivo | Conteúdo |
+|---|---|
+| `convergencia.csv` | custo a cada iteração do Twiddle |
+| `resultados.csv` | desempenho dos três agentes nos cenários de teste |
+| `trajetoria.csv` | um mês de baixa temporada, dia a dia |
+
+Os resultados são reproduzíveis: as sementes aleatórias são fixas.
+
+### Testes do agente
+
+```bash
+./mvnw test -Dtest=AgentePrecificacaoTest,ControladorPIDTest
+```
+
+### Uso no sistema
+
+Com o sistema rodando, entre como **administradora** e acesse **Financeiro → Precificação** para:
+
+- definir a meta do mês;
+- recalibrar os ganhos;
+- gerar e aprovar sugestões de preço.
+
+O relatório completo do trabalho (PEAS, metodologia, resultados e limitações) foi entregue separadamente na disciplina.
